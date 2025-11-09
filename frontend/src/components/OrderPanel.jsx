@@ -5,9 +5,10 @@ import { TAX_RATE } from '../constants/menuItems'
 import './OrderPanel.css'
 
 function OrderPanel({ cart, onRemoveItem, onCompleteTransaction }) {
-  const subtotal = cart.reduce((sum, item) => sum + item.price, 0)
-  const tax = subtotal * TAX_RATE
-  const total = subtotal + tax
+  const cartItems = Object.values(cart);
+  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const tax = subtotal * TAX_RATE;
+  const total = subtotal + tax;
 
   return (
     <section className="order-section">
@@ -18,13 +19,13 @@ function OrderPanel({ cart, onRemoveItem, onCompleteTransaction }) {
         </h2>
         
         <div className="order-items">
-          {cart.length === 0 ? (
+          {cartItems.length === 0 ? (
             <div className="empty-cart">No items in cart</div>
           ) : (
             <div className="cart-items">
-              {cart.map(item => (
+              {cartItems.map(item => (
                 <CartItem 
-                  key={item.cartId} 
+                  key={item.id} 
                   item={item} 
                   onRemove={onRemoveItem}
                 />
@@ -36,7 +37,7 @@ function OrderPanel({ cart, onRemoveItem, onCompleteTransaction }) {
         <OrderSummary subtotal={subtotal} tax={tax} total={total} />
 
         <CompleteButton 
-          disabled={cart.length === 0}
+          disabled={cartItems.length === 0}
           onClick={onCompleteTransaction}
         />
       </div>

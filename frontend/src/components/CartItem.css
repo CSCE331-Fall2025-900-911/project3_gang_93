@@ -10,10 +10,38 @@
   border-bottom: none;
 }
 
+.cart-item-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cart-item-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.cart-item-quantity {
+  font-size: 0.85rem;
+  color: #666;
+}
+
 .cart-item-right {
   display: flex;
   align-items: center;
   gap: 1rem;
+}
+
+.cart-item-price {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #333;
+}
+
+.cart-item-unit-price {
+  font-size: 0.9rem;
+  color: #666;
 }
 
 .remove-button {
