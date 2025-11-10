@@ -1,0 +1,16 @@
+employeeId,firstName,lastName,authLevel,startDate
+1,John,Williams,Manager,2023-01-15
+2,John,Miller,Manager,2023-02-20
+3,Pat,Lee,Barista,2024-11-01
+4,Taylor,Brown,Barista,2024-03-10
+5,Jane,Lee,Barista,2024-04-30
+6,John,Wilson,Barista,2024-05-15
+7,Pat,Moore,Manager,2024-12-01
+8,Pat,Williams,Barista,2024-01-20
+9,Sue,Moore,Barista,2024-06-15
+10,Sue,Wilson,Barista,2025-10-30
+11,Pat,Brown,Barista,2025-07-31
+12,Taylor,Smith,Barista,2025-08-31
+13,Jane,Moore,Manager,2025-09-30
+14,Sue,Smith,Barista,2025-11-15
+15,Sue,Davis,Barista,2025-11-27
