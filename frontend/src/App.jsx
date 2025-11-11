@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Header, MenuGrid, OrderPanel } from "./components";
 import { menuAPI, transactionAPI } from "./services/api";
 import { TAX_RATE } from "./constants/menuItems";
+import PaymentSelector from "./components/PaymentSelector";
 import "./App.css";
 
 function App() {
@@ -9,6 +10,9 @@ function App() {
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState(null);
+
 
   // Fetch menu items from backend on component mount
   useEffect(() => {
@@ -75,6 +79,12 @@ function App() {
 
   const completeTransaction = async () => {
     if (Object.keys(cart).length === 0) return;
+    setPopupOpen(true);
+  };
+
+  const handlePaymentSelect = async (method) => {
+    if (Object.keys(cart).length === 0) return;
+    setPopupOpen(false);
 
     try {
       // Calculate total for display
@@ -86,7 +96,7 @@ function App() {
       // Create transaction via API
       const result = await transactionAPI.create({
         items: cart,
-        transactionType: 'card', // You can make this selectable
+        transactionType: method.toLowerCase(), // "card" or "cash"
         customerId: null, // You can add customer lookup later
       });
 
@@ -141,6 +151,11 @@ function App() {
           onCompleteTransaction={completeTransaction}
         />
       </main>
+      <PaymentSelector
+        open={popupOpen}
+        onClose={() => setPopupOpen(false)}
+        onSelect={handlePaymentSelect}
+      />
     </div>
   );
 }
