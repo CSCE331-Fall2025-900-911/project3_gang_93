@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from datetime import date, time, datetime
 import json
+import os
 
 from models import *
 from database import execute_query, execute_insert, get_db_cursor
@@ -11,9 +12,15 @@ from database import execute_query, execute_insert, get_db_cursor
 app = FastAPI(title="POS System API", version="1.0.0")
 
 # CORS middleware for frontend
+# Get allowed origins from environment variable or use defaults
+allowed_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://localhost:3000,https://project3-gang-93.onrender.com"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Vite default port
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
