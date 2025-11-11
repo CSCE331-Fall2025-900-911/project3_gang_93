@@ -1,5 +1,5 @@
 """FastAPI application for POS System"""
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from datetime import date, time, datetime
@@ -84,118 +84,156 @@ def get_menu_item(menu_item_id: int):
 
 # ================== TRANSACTION APIs ==================
 
+def process_inventory_and_sales(inventory_updates, sales_records, trans_date, trans_time):
+    """Background task to process inventory updates and sales records"""
+    try:
+        with get_db_cursor() as cursor:
+            # Batch inventory updates using executemany
+            if inventory_updates:
+                inventory_batch = [(total_qty, item_id, total_qty) 
+                                 for item_id, total_qty in inventory_updates.items()]
+                cursor.executemany("""
+                    UPDATE inventory
+                    SET quantity = quantity - %s
+                    WHERE itemId = %s AND quantity >= %s
+                """, inventory_batch)
+            
+            # Batch sales inserts
+            if sales_records:
+                cursor.execute("SELECT COALESCE(MAX(saleId), 0) as max_id FROM sales")
+                max_sale = cursor.fetchone()
+                next_sale_id = (max_sale['max_id'] if max_sale else 0) + 1
+                
+                sales_batch = []
+                for idx, sale in enumerate(sales_records):
+                    sales_batch.append((
+                        next_sale_id + idx,
+                        sale['itemName'],
+                        sale['quantity'],
+                        trans_date,
+                        trans_time
+                    ))
+                
+                if sales_batch:
+                    cursor.executemany("""
+                        INSERT INTO sales (saleId, itemName, amountSold, date, time)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, sales_batch)
+    except Exception as e:
+        # Log error but don't fail the transaction
+        print(f"Background task error: {e}")
+
 @app.post("/api/transactions", response_model=TransactionResponse)
-def create_transaction(transaction: TransactionCreate):
-    """Create a new transaction"""
+def create_transaction(transaction: TransactionCreate, background_tasks: BackgroundTasks):
+    """Create a new transaction - returns immediately, processes inventory/sales in background"""
     try:
         # Parse date/time from string if provided, otherwise use current
         if transaction.date:
-            # Parse date string (YYYY-MM-DD) to date object
             trans_date = datetime.strptime(transaction.date, '%Y-%m-%d').date()
         else:
             trans_date = datetime.now().date()
         
         if transaction.time:
-            # Parse time string (HH:MM:SS) to time object
             trans_time = datetime.strptime(transaction.time, '%H:%M:%S').time()
         else:
             trans_time = datetime.now().time()
         
-        # Calculate total
-        total = 0.0
-        items_with_prices = []
-        
-        for item in transaction.items:
-            query = "SELECT price FROM menu WHERE menuItemId = %s"
-            menu_item = execute_query(query, (item.menuItemId,), fetch_one=True)
-            if menu_item:
+        # Use a single database connection for critical operations
+        with get_db_cursor() as cursor:
+            # OPTIMIZATION: Batch fetch all menu items in one query
+            menu_item_ids = [item.menuItemId for item in transaction.items]
+            if not menu_item_ids:
+                raise HTTPException(status_code=400, detail="No items in transaction")
+            
+            placeholders = ','.join(['%s'] * len(menu_item_ids))
+            menu_query = f"""
+                SELECT menuItemId, price, ingredients, menuItemName 
+                FROM menu 
+                WHERE menuItemId IN ({placeholders})
+            """
+            cursor.execute(menu_query, tuple(menu_item_ids))
+            menu_items = cursor.fetchall()
+            
+            # Create lookup dictionary
+            menu_dict = {item['menuitemid']: item for item in menu_items}
+            
+            # Calculate total and prepare data
+            total = 0.0
+            items_with_prices = []
+            inventory_updates = {}  # itemId -> total_qty_to_deduct
+            sales_records = []
+            
+            for item in transaction.items:
+                menu_item = menu_dict.get(item.menuItemId)
+                if not menu_item:
+                    continue
+                
+                # Calculate price
                 item_total = float(menu_item['price']) * item.quantity
                 total += item_total
                 items_with_prices.append({
                     "menuItemId": item.menuItemId,
                     "quantity": item.quantity
                 })
-        
-        # Get next transaction ID
-        query = "SELECT COALESCE(MAX(transactionId), 0) + 1 as next_id FROM transactions"
-        next_id = execute_query(query, fetch_one=True)
-        transaction_id = next_id['next_id'] if next_id else 1
-        
-        # Insert transaction
-        insert_query = """
-            INSERT INTO transactions (transactionId, date, customerId, items, time, transactionType)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING transactionId
-        """
-        
-        result = execute_insert(
-            insert_query,
-            (
+                
+                # Prepare inventory updates (for background processing)
+                ingredients = menu_item['ingredients']
+                if ingredients:
+                    if isinstance(ingredients, str):
+                        ingredients = json.loads(ingredients)
+                    
+                    for ingredient in ingredients:
+                        item_id = ingredient['itemId']
+                        qty_to_deduct = ingredient['qty'] * item.quantity
+                        if item_id not in inventory_updates:
+                            inventory_updates[item_id] = 0
+                        inventory_updates[item_id] += qty_to_deduct
+                
+                # Prepare sales records (for background processing)
+                sales_records.append({
+                    'itemName': menu_item['menuitemname'],
+                    'quantity': item.quantity
+                })
+            
+            # Get next transaction ID
+            cursor.execute("SELECT COALESCE(MAX(transactionId), 0) + 1 as next_id FROM transactions")
+            next_id = cursor.fetchone()
+            transaction_id = next_id['next_id'] if next_id else 1
+            
+            # Insert transaction (CRITICAL - must complete before returning)
+            cursor.execute("""
+                INSERT INTO transactions (transactionId, date, customerId, items, time, transactionType)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING transactionId
+            """, (
                 transaction_id,
                 trans_date,
                 transaction.customerId,
                 json.dumps(items_with_prices),
                 trans_time,
                 transaction.transactionType
+            ))
+            
+            # Update customer points if customer provided (CRITICAL - should complete before returning)
+            if transaction.customerId and transaction.transactionType != 'void':
+                points_to_add = int(total)
+                cursor.execute("""
+                    UPDATE customerRewards
+                    SET points = points + %s
+                    WHERE customerId = %s
+                """, (points_to_add, transaction.customerId))
+            
+            # Schedule inventory and sales processing in background
+            # This allows us to return immediately while processing continues
+            background_tasks.add_task(
+                process_inventory_and_sales,
+                inventory_updates,
+                sales_records,
+                trans_date,
+                trans_time
             )
-        )
         
-        # Update customer points if customer provided
-        if transaction.customerId and transaction.transactionType != 'void':
-            points_to_add = int(total)  # 1 point per dollar
-            update_query = """
-                UPDATE customerRewards
-                SET points = points + %s
-                WHERE customerId = %s
-            """
-            execute_query(update_query, (points_to_add, transaction.customerId), fetch_all=False)
-        
-        # Deduct inventory for each item
-        for item in transaction.items:
-            # Get ingredients for this menu item
-            ing_query = "SELECT ingredients FROM menu WHERE menuItemId = %s"
-            menu_item = execute_query(ing_query, (item.menuItemId,), fetch_one=True)
-            
-            if menu_item and menu_item['ingredients']:
-                ingredients = menu_item['ingredients']
-                if isinstance(ingredients, str):
-                    ingredients = json.loads(ingredients)
-                
-                # Update inventory for each ingredient
-                for ingredient in ingredients:
-                    update_inv = """
-                        UPDATE inventory
-                        SET quantity = quantity - %s
-                        WHERE itemId = %s AND quantity >= %s
-                    """
-                    qty_to_deduct = ingredient['qty'] * item.quantity
-                    execute_query(
-                        update_inv,
-                        (qty_to_deduct, ingredient['itemId'], qty_to_deduct),
-                        fetch_all=False
-                    )
-        
-        # Create sales records
-        for item in transaction.items:
-            menu_query = "SELECT menuItemName FROM menu WHERE menuItemId = %s"
-            menu_item = execute_query(menu_query, (item.menuItemId,), fetch_one=True)
-            
-            if menu_item:
-                # Get next sale ID
-                sale_id_query = "SELECT COALESCE(MAX(saleId), 0) + 1 as next_id FROM sales"
-                next_sale = execute_query(sale_id_query, fetch_one=True)
-                sale_id = next_sale['next_id'] if next_sale else 1
-                
-                sales_insert = """
-                    INSERT INTO sales (saleId, itemName, amountSold, date, time)
-                    VALUES (%s, %s, %s, %s, %s)
-                """
-                execute_query(
-                    sales_insert,
-                    (sale_id, menu_item['menuitemname'], item.quantity, trans_date, trans_time),
-                    fetch_all=False
-                )
-        
+        # Return immediately - background task will handle inventory and sales
         return {
             "transactionId": transaction_id,
             "message": "Transaction completed successfully",
