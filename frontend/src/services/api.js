@@ -1,6 +1,6 @@
 // API Service for backend communication
-import { API_BASE_URL, API_ENDPOINTS } from '../config/api';
-import { getMenuIcon } from '../utils/menuIcons';
+import { API_BASE_URL, API_ENDPOINTS } from "../config/api";
+import { getMenuIcon } from "../utils/menuIcons";
 
 /**
  * Generic API request handler
@@ -9,7 +9,7 @@ async function apiRequest(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   const config = {
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...options.headers,
     },
     ...options,
@@ -17,15 +17,17 @@ async function apiRequest(endpoint, options = {}) {
 
   try {
     const response = await fetch(url, config);
-    
+
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: response.statusText }));
+      const error = await response
+        .json()
+        .catch(() => ({ error: response.statusText }));
       throw new Error(error.error || `HTTP error! status: ${response.status}`);
     }
-    
+
     return await response.json();
   } catch (error) {
-    console.error('API request failed:', error);
+    console.error("API request failed:", error);
     throw error;
   }
 }
@@ -38,7 +40,7 @@ export const menuAPI = {
   getAll: async () => {
     const data = await apiRequest(API_ENDPOINTS.MENU);
     // Transform backend response to frontend format
-    return data.menuItems.map(item => ({
+    return data.menuItems.map((item) => ({
       id: item.menuItemId,
       menuItemId: item.menuItemId,
       name: item.menuItemName,
@@ -70,7 +72,7 @@ export const transactionAPI = {
   create: async (transactionData) => {
     // Transform frontend cart to backend format
     // transactionData.items is an object with item IDs as keys
-    const items = Object.values(transactionData.items || {}).map(item => ({
+    const items = Object.values(transactionData.items || {}).map((item) => ({
       menuItemId: item.menuItemId || item.id,
       quantity: item.quantity || 1,
     }));
@@ -78,18 +80,21 @@ export const transactionAPI = {
     // Build payload - backend will automatically set date/time to current values
     const payload = {
       items: items,
-      transactionType: transactionData.transactionType || 'card',
+      transactionType: transactionData.transactionType || "card",
     };
 
     // Only include customerId if provided (not null/undefined)
-    if (transactionData.customerId !== null && transactionData.customerId !== undefined) {
+    if (
+      transactionData.customerId !== null &&
+      transactionData.customerId !== undefined
+    ) {
       payload.customerId = transactionData.customerId;
     }
-    
+
     // Note: We don't send date/time - backend will use current date/time automatically
 
     return await apiRequest(API_ENDPOINTS.TRANSACTIONS, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(payload),
     });
   },
@@ -97,16 +102,16 @@ export const transactionAPI = {
   // Get all transactions
   getAll: async (filters = {}) => {
     const params = new URLSearchParams();
-    if (filters.date) params.append('date', filters.date);
-    if (filters.customerId) params.append('customerId', filters.customerId);
-    if (filters.limit) params.append('limit', filters.limit);
-    if (filters.offset) params.append('offset', filters.offset);
+    if (filters.date) params.append("date", filters.date);
+    if (filters.customerId) params.append("customerId", filters.customerId);
+    if (filters.limit) params.append("limit", filters.limit);
+    if (filters.offset) params.append("offset", filters.offset);
 
     const queryString = params.toString();
-    const endpoint = queryString 
+    const endpoint = queryString
       ? `${API_ENDPOINTS.TRANSACTIONS}?${queryString}`
       : API_ENDPOINTS.TRANSACTIONS;
-    
+
     return await apiRequest(endpoint);
   },
 
@@ -147,7 +152,7 @@ export const testConnection = async () => {
     const response = await fetch(`${API_BASE_URL}/`);
     return await response.json();
   } catch (error) {
-    console.error('Backend connection failed:', error);
+    console.error("Backend connection failed:", error);
     return null;
   }
 };
@@ -158,4 +163,3 @@ export default {
   customerAPI,
   testConnection,
 };
-
