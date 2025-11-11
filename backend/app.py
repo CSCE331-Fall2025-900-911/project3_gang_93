@@ -195,10 +195,20 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                     'quantity': item.quantity
                 })
             
+            # Add tip to total
+            tip_amount = float(transaction.tip) if transaction.tip else 0.0
+            total += tip_amount
+            
             # Get next transaction ID
             cursor.execute("SELECT COALESCE(MAX(transactionId), 0) + 1 as next_id FROM transactions")
             next_id = cursor.fetchone()
             transaction_id = next_id['next_id'] if next_id else 1
+            
+            # Prepare items JSON with tip metadata
+            items_json = {
+                "items": items_with_prices,
+                "tip": tip_amount
+            }
             
             # Insert transaction (CRITICAL - must complete before returning)
             cursor.execute("""
@@ -209,14 +219,16 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                 transaction_id,
                 trans_date,
                 transaction.customerId,
-                json.dumps(items_with_prices),
+                json.dumps(items_json),
                 trans_time,
                 transaction.transactionType
             ))
             
             # Update customer points if customer provided (CRITICAL - should complete before returning)
+            # Points are based on subtotal (before tip)
             if transaction.customerId and transaction.transactionType != 'void':
-                points_to_add = int(total)
+                subtotal_for_points = total - tip_amount
+                points_to_add = int(subtotal_for_points)
                 cursor.execute("""
                     UPDATE customerRewards
                     SET points = points + %s
@@ -289,9 +301,18 @@ def get_transactions(
         # Format transactions
         formatted_transactions = []
         for t in transactions:
-            items = t['items']
-            if isinstance(items, str):
-                items = json.loads(items)
+            items_data = t['items']
+            if isinstance(items_data, str):
+                items_data = json.loads(items_data)
+            
+            # Handle both old format (array) and new format (object with items and tip)
+            if isinstance(items_data, dict) and 'items' in items_data:
+                items = items_data['items']
+                tip = items_data.get('tip', 0.0)
+            else:
+                # Old format - just an array
+                items = items_data if isinstance(items_data, list) else []
+                tip = 0.0
             
             # Calculate total
             total = 0.0
@@ -300,6 +321,9 @@ def get_transactions(
                 menu_item = execute_query(price_query, (item['menuItemId'],), fetch_one=True)
                 if menu_item:
                     total += float(menu_item['price']) * item['quantity']
+            
+            # Add tip to total
+            total += float(tip)
             
             formatted_transactions.append({
                 "transactionId": t['transactionid'],
@@ -335,9 +359,18 @@ def get_transaction(transaction_id: int):
         if not transaction:
             raise HTTPException(status_code=404, detail="Transaction not found")
         
-        items = transaction['items']
-        if isinstance(items, str):
-            items = json.loads(items)
+        items_data = transaction['items']
+        if isinstance(items_data, str):
+            items_data = json.loads(items_data)
+        
+        # Handle both old format (array) and new format (object with items and tip)
+        if isinstance(items_data, dict) and 'items' in items_data:
+            items = items_data['items']
+            tip = items_data.get('tip', 0.0)
+        else:
+            # Old format - just an array
+            items = items_data if isinstance(items_data, list) else []
+            tip = 0.0
         
         # Calculate total
         total = 0.0
@@ -346,6 +379,9 @@ def get_transaction(transaction_id: int):
             menu_item = execute_query(price_query, (item['menuItemId'],), fetch_one=True)
             if menu_item:
                 total += float(menu_item['price']) * item['quantity']
+        
+        # Add tip to total
+        total += float(tip)
         
         return {
             "transactionId": transaction['transactionid'],

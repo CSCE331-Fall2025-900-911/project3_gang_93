@@ -25,6 +25,7 @@ class TransactionCreate(BaseModel):
     transactionType: str = Field(..., pattern="^(card|cash|void)$")
     date: Optional[str] = None  # Accept date as string (YYYY-MM-DD) or None
     time: Optional[str] = None  # Accept time as string (HH:MM:SS) or None
+    tip: Optional[Decimal] = 0  # Optional tip amount
 
 class TransactionResponse(BaseModel):
     transactionId: int

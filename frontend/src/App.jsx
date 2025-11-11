@@ -4,6 +4,7 @@ import { menuAPI, transactionAPI } from "./services/api";
 import { TAX_RATE } from "./constants/menuItems";
 import { API_BASE_URL } from "./config/api";
 import PaymentSelector from "./components/PaymentSelector";
+import AlertModal from "./components/AlertModal";
 import "./App.css";
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [popupOpen, setPopupOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState(null);
 
   // Fetch menu items from backend on component mount
   useEffect(() => {
@@ -83,7 +85,11 @@ function App() {
     setPopupOpen(true);
   };
 
-  const handlePaymentSelect = async (method, cashGiven = null) => {
+  const handlePaymentSelect = async (
+    method,
+    cashGiven = null,
+    tipAmount = 0
+  ) => {
     if (Object.keys(cart).length === 0) return;
     setPopupOpen(false);
 
@@ -95,37 +101,48 @@ function App() {
         0
       );
       const tax = subtotal * TAX_RATE;
-      const total = subtotal + tax;
+      const tip = tipAmount || 0;
+      const total = subtotal + tax + tip;
 
       if (method === "Cash") {
-      if (cashGiven < total) {
-        alert(`Insufficient cash! Total due is $${total.toFixed(2)}.`);
-        return;
+        if (cashGiven < total) {
+          setAlertMessage(
+            `Insufficient cash! Total due is $${total.toFixed(2)}.`
+          );
+          return;
+        }
       }
-      const change = cashGiven - total;
-      alert(`Change due: $${change.toFixed(2)}`);
-    }
 
       // Create transaction via API
       const result = await transactionAPI.create({
         items: cart,
         transactionType: method.toLowerCase(), // "card" or "cash"
         customerId: null, // You can add customer lookup later
+        tip: tip,
       });
 
       // Show success message
-      alert(
-        `Transaction completed!\nPayment: ${
-          method
-        }\nTransaction ID: ${
-          result.transactionId
-        }`);
+      let message = `Transaction completed!\nPayment: ${method}\nTransaction ID: ${result.transactionId}`;
+      if (tip > 0) {
+        message += `\nTip: $${tip.toFixed(2)}`;
+      }
+      message += `\nTotal: $${total.toFixed(2)}`;
+
+      // Add change information for cash payments
+      if (method === "Cash") {
+        const change = cashGiven - total;
+        if (change > 0) {
+          message += `\nChange due: $${change.toFixed(2)}`;
+        }
+      }
+
+      setAlertMessage(message);
 
       // Clear cart
       setCart({});
     } catch (err) {
       console.error("Transaction failed:", err);
-      alert(`Transaction failed: ${err.message}\nPlease try again.`);
+      setAlertMessage(`Transaction failed: ${err.message}\nPlease try again.`);
     }
   };
 
@@ -189,6 +206,15 @@ function App() {
         open={popupOpen}
         onClose={() => setPopupOpen(false)}
         onSelect={handlePaymentSelect}
+        subtotal={Object.values(cart).reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
+        )}
+      />
+      <AlertModal
+        message={alertMessage}
+        show={!!alertMessage}
+        onClose={() => setAlertMessage(null)}
       />
     </div>
   );

@@ -91,6 +91,11 @@ export const transactionAPI = {
       payload.customerId = transactionData.customerId;
     }
 
+    // Include tip if provided
+    if (transactionData.tip !== null && transactionData.tip !== undefined) {
+      payload.tip = transactionData.tip;
+    }
+
     // Note: We don't send date/time - backend will use current date/time automatically
 
     return await apiRequest(API_ENDPOINTS.TRANSACTIONS, {
