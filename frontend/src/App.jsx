@@ -24,7 +24,9 @@ function App() {
         setError(null);
       } catch (err) {
         console.error("Failed to fetch menu:", err);
-        setError("Failed to load menu. Please make sure the backend server is running.");
+        setError(
+          "Failed to load menu. Please make sure the backend server is running."
+        );
       } finally {
         setLoading(false);
       }
@@ -89,7 +91,10 @@ function App() {
     try {
       // Calculate total for display
       const cartItems = Object.values(cart);
-      const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const subtotal = cartItems.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      );
       const tax = subtotal * TAX_RATE;
       const total = subtotal + tax;
 
@@ -101,8 +106,12 @@ function App() {
       });
 
       // Show success message
-      alert(`Transaction completed successfully!\nTransaction ID: ${result.transactionId}\nTotal: $${total.toFixed(2)}`);
-      
+      alert(
+        `Transaction completed successfully!\nTransaction ID: ${
+          result.transactionId
+        }\nTotal: $${total.toFixed(2)}`
+      );
+
       // Clear cart
       setCart({});
     } catch (err) {
@@ -116,7 +125,7 @@ function App() {
       <div className="app">
         <Header />
         <main className="main-content">
-          <div style={{ padding: '2rem', textAlign: 'center' }}>
+          <div style={{ padding: "2rem", textAlign: "center" }}>
             <p>Loading menu...</p>
           </div>
         </main>
@@ -129,10 +138,26 @@ function App() {
       <div className="app">
         <Header />
         <main className="main-content">
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'red' }}>
+          <div style={{ padding: "2rem", textAlign: "center", color: "red" }}>
             <p>{error}</p>
-            <p style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
+            <p style={{ marginTop: "1rem", fontSize: "0.9rem" }}>
               Make sure the backend server is running at http://localhost:8000
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (menuItems.length === 0) {
+    return (
+      <div className="app">
+        <Header />
+        <main className="main-content">
+          <div style={{ padding: "2rem", textAlign: "center" }}>
+            <p>No menu items available.</p>
+            <p style={{ marginTop: "1rem", fontSize: "0.9rem", color: "#666" }}>
+              Please check the database connection.
             </p>
           </div>
         </main>
