@@ -97,6 +97,10 @@ def process_inventory_and_sales(inventory_updates, sales_records, trans_date, tr
                     SET quantity = quantity - %s
                     WHERE itemId = %s AND quantity >= %s
                 """, inventory_batch)
+                
+                # Log inventory updates for debugging
+                rows_updated = cursor.rowcount if hasattr(cursor, 'rowcount') else len(inventory_batch)
+                print(f"Inventory update: Updated {rows_updated} items from {len(inventory_updates)} inventory entries")
             
             # Batch sales inserts
             if sales_records:
@@ -113,15 +117,18 @@ def process_inventory_and_sales(inventory_updates, sales_records, trans_date, tr
                         trans_date,
                         trans_time
                     ))
-                
+                    
                 if sales_batch:
                     cursor.executemany("""
                         INSERT INTO sales (saleId, itemName, amountSold, date, time)
                         VALUES (%s, %s, %s, %s, %s)
                     """, sales_batch)
+                    print(f"Sales records: Inserted {len(sales_batch)} sales records")
     except Exception as e:
         # Log error but don't fail the transaction
+        import traceback
         print(f"Background task error: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
 
 @app.post("/api/transactions", response_model=TransactionResponse)
 def create_transaction(transaction: TransactionCreate, background_tasks: BackgroundTasks):
