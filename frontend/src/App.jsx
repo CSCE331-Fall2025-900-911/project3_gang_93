@@ -84,7 +84,7 @@ function App() {
     setPopupOpen(true);
   };
 
-  const handlePaymentSelect = async (method) => {
+  const handlePaymentSelect = async (method, cashGiven = null) => {
     if (Object.keys(cart).length === 0) return;
     setPopupOpen(false);
 
@@ -98,6 +98,15 @@ function App() {
       const tax = subtotal * TAX_RATE;
       const total = subtotal + tax;
 
+      if (method === "Cash") {
+      if (cashGiven < total) {
+        alert(`Insufficient cash! Total due is $${total.toFixed(2)}.`);
+        return;
+      }
+      const change = cashGiven - total;
+      alert(`Change due: $${change.toFixed(2)}`);
+    }
+
       // Create transaction via API
       const result = await transactionAPI.create({
         items: cart,
@@ -107,10 +116,11 @@ function App() {
 
       // Show success message
       alert(
-        `Transaction completed successfully!\nTransaction ID: ${
+        `Transaction completed!\nPayment: ${
+          method
+        }\nTransaction ID: ${
           result.transactionId
-        }\nTotal: $${total.toFixed(2)}`
-      );
+        }`);
 
       // Clear cart
       setCart({});
