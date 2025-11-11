@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Header, MenuGrid, OrderPanel } from "./components";
 import { menuAPI, transactionAPI } from "./services/api";
 import { TAX_RATE } from "./constants/menuItems";
+import { API_BASE_URL } from "./config/api";
 import PaymentSelector from "./components/PaymentSelector";
 import "./App.css";
 
@@ -11,8 +12,6 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [popupOpen, setPopupOpen] = useState(false);
-  const [selectedMethod, setSelectedMethod] = useState(null);
-
 
   // Fetch menu items from backend on component mount
   useEffect(() => {
@@ -141,7 +140,7 @@ function App() {
           <div style={{ padding: "2rem", textAlign: "center", color: "red" }}>
             <p>{error}</p>
             <p style={{ marginTop: "1rem", fontSize: "0.9rem" }}>
-              Make sure the backend server is running at http://localhost:8000
+              Make sure the backend server is running at {API_BASE_URL}
             </p>
           </div>
         </main>
