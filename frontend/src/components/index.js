@@ -6,4 +6,5 @@ export { default as CartItem } from './CartItem'
 export { default as OrderSummary } from './OrderSummary'
 export { default as CompleteButton } from './CompleteButton'
 export { default as OrderPanel } from './OrderPanel'
+export { default as KioskView } from './KioskView'
 

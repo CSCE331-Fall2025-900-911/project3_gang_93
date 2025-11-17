@@ -5,6 +5,7 @@ import { TAX_RATE } from "./constants/menuItems";
 import { API_BASE_URL } from "./config/api";
 import PaymentSelector from "./components/PaymentSelector";
 import AlertModal from "./components/AlertModal";
+import KioskView from "./components/KioskView";
 import "./App.css";
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
   const [error, setError] = useState(null);
   const [popupOpen, setPopupOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState(null);
+  const [viewMode, setViewMode] = useState("cashier"); // "cashier" or "kiosk"
 
   // Fetch menu items from backend on component mount
   useEffect(() => {
@@ -146,10 +148,16 @@ function App() {
     }
   };
 
+  const toggleViewMode = () => {
+    setViewMode((prev) => (prev === "cashier" ? "kiosk" : "cashier"));
+  };
+
   if (loading) {
     return (
       <div className="app">
-        <Header />
+        {viewMode === "cashier" && (
+          <Header viewMode={viewMode} onViewModeChange={toggleViewMode} />
+        )}
         <main className="main-content">
           <div style={{ padding: "2rem", textAlign: "center" }}>
             <p>Loading menu...</p>
@@ -162,7 +170,9 @@ function App() {
   if (error) {
     return (
       <div className="app">
-        <Header />
+        {viewMode === "cashier" && (
+          <Header viewMode={viewMode} onViewModeChange={toggleViewMode} />
+        )}
         <main className="main-content">
           <div style={{ padding: "2rem", textAlign: "center", color: "red" }}>
             <p>{error}</p>
@@ -178,7 +188,9 @@ function App() {
   if (menuItems.length === 0) {
     return (
       <div className="app">
-        <Header />
+        {viewMode === "cashier" && (
+          <Header viewMode={viewMode} onViewModeChange={toggleViewMode} />
+        )}
         <main className="main-content">
           <div style={{ padding: "2rem", textAlign: "center" }}>
             <p>No menu items available.</p>
@@ -191,9 +203,40 @@ function App() {
     );
   }
 
+  // Kiosk View
+  if (viewMode === "kiosk") {
+    return (
+      <div className="app">
+        <KioskView
+          menuItems={menuItems}
+          cart={cart}
+          onAddToCart={addToCart}
+          onRemoveItem={removeFromCart}
+          onCompleteTransaction={completeTransaction}
+          onSwitchToCashier={toggleViewMode}
+        />
+        <PaymentSelector
+          open={popupOpen}
+          onClose={() => setPopupOpen(false)}
+          onSelect={handlePaymentSelect}
+          subtotal={Object.values(cart).reduce(
+            (sum, item) => sum + item.price * item.quantity,
+            0
+          )}
+        />
+        <AlertModal
+          message={alertMessage}
+          show={!!alertMessage}
+          onClose={() => setAlertMessage(null)}
+        />
+      </div>
+    );
+  }
+
+  // Cashier View
   return (
     <div className="app">
-      <Header />
+      <Header viewMode={viewMode} onViewModeChange={toggleViewMode} />
       <main className="main-content">
         <MenuGrid items={menuItems} onAddToCart={addToCart} />
         <OrderPanel
