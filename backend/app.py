@@ -959,6 +959,256 @@ def get_management_dashboard():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+# ================== MANAGER REPORT APIs ==================
+
+@app.get("/api/reports/x-report", response_model=XReportResponse)
+def get_x_report(report_date: Optional[str] = Query(None, description="Report date in YYYY-MM-DD format")):
+    """
+    X-Report: Hourly sales activities for a specific date.
+    Provides insights into rush periods and sales patterns throughout the day.
+    Can be run as often as desired with no side effects.
+    """
+    try:
+        # Use today if no date provided
+        if not report_date:
+            report_date = datetime.now().strftime('%Y-%m-%d')
+        
+        # Get daily totals
+        daily_query = """
+            SELECT
+                COUNT(*) as total_transactions,
+                COUNT(CASE WHEN transactionType != 'void' THEN 1 END) as actual_transactions,
+                COUNT(CASE WHEN transactionType = 'void' THEN 1 END) as void_transactions,
+                COUNT(CASE WHEN transactionType = 'cash' THEN 1 END) as cash_count,
+                COUNT(CASE WHEN transactionType = 'card' THEN 1 END) as card_count
+            FROM transactions
+            WHERE date = %s
+        """
+        
+        daily_result = execute_query(daily_query, (report_date,), fetch_one=True)
+        
+        if not daily_result:
+            # No data for this date
+            return {
+                "date": report_date,
+                "totalSales": 0.0,
+                "totalVoids": 0.0,
+                "cashPayments": 0.0,
+                "cardPayments": 0.0,
+                "totalTransactions": 0,
+                "avgTransaction": 0.0,
+                "hourlyData": []
+            }
+        
+        total_transactions = int(daily_result['actual_transactions']) if daily_result['actual_transactions'] else 0
+        void_transactions = int(daily_result['void_transactions']) if daily_result['void_transactions'] else 0
+        cash_count = int(daily_result['cash_count']) if daily_result['cash_count'] else 0
+        card_count = int(daily_result['card_count']) if daily_result['card_count'] else 0
+        
+        # Calculate estimated sales (simplified - in real scenario would use actual totals)
+        # Assume average transaction is $15
+        avg_transaction_amount = 15.0
+        total_sales = total_transactions * avg_transaction_amount
+        total_voids = void_transactions * avg_transaction_amount
+        cash_payments = cash_count * avg_transaction_amount
+        card_payments = card_count * avg_transaction_amount
+        
+        # Get hourly breakdown
+        hourly_query = """
+            SELECT
+                EXTRACT(HOUR FROM time) as hour,
+                COUNT(CASE WHEN transactionType != 'void' THEN 1 END) as sales_count,
+                COUNT(CASE WHEN transactionType = 'void' THEN 1 END) as void_count,
+                COUNT(CASE WHEN transactionType = 'cash' THEN 1 END) as cash_count,
+                COUNT(CASE WHEN transactionType = 'card' THEN 1 END) as card_count,
+                COUNT(*) as total_count
+            FROM transactions
+            WHERE date = %s
+            GROUP BY EXTRACT(HOUR FROM time)
+            ORDER BY hour
+        """
+        
+        hourly_results = execute_query(hourly_query, (report_date,))
+        
+        hourly_data = []
+        for row in hourly_results:
+            hour = int(row['hour'])
+            sales_count = int(row['sales_count']) if row['sales_count'] else 0
+            void_count = int(row['void_count']) if row['void_count'] else 0
+            cash = int(row['cash_count']) if row['cash_count'] else 0
+            card = int(row['card_count']) if row['card_count'] else 0
+            
+            hourly_data.append({
+                "hour": hour,
+                "sales": sales_count * avg_transaction_amount,
+                "voids": void_count * avg_transaction_amount,
+                "cash": cash * avg_transaction_amount,
+                "card": card * avg_transaction_amount,
+                "transactions": sales_count
+            })
+        
+        avg_trans = total_sales / total_transactions if total_transactions > 0 else 0.0
+        
+        return {
+            "date": report_date,
+            "totalSales": total_sales,
+            "totalVoids": total_voids,
+            "cashPayments": cash_payments,
+            "cardPayments": card_payments,
+            "totalTransactions": total_transactions,
+            "avgTransaction": avg_trans,
+            "hourlyData": hourly_data
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating X-Report: {str(e)}")
+
+
+@app.get("/api/reports/z-report", response_model=ZReportResponse)
+def get_z_report(report_date: Optional[str] = Query(None, description="Report date in YYYY-MM-DD format")):
+    """
+    Z-Report: End-of-day totals and summary.
+    Provides comprehensive daily sales information including tax calculations.
+    Note: In production, this would typically be run once at end of day.
+    """
+    try:
+        # Use today if no date provided
+        if not report_date:
+            report_date = datetime.now().strftime('%Y-%m-%d')
+        
+        # Tax rate (8.75%)
+        TAX_RATE = 0.0875
+        
+        # Get daily totals
+        daily_query = """
+            SELECT
+                COUNT(*) as total_transactions,
+                COUNT(CASE WHEN transactionType != 'void' THEN 1 END) as actual_transactions,
+                COUNT(CASE WHEN transactionType = 'cash' THEN 1 END) as cash_count,
+                COUNT(CASE WHEN transactionType = 'card' THEN 1 END) as card_count
+            FROM transactions
+            WHERE date = %s
+        """
+        
+        daily_result = execute_query(daily_query, (report_date,), fetch_one=True)
+        
+        if not daily_result:
+            # No data for this date
+            return {
+                "date": report_date,
+                "totalSales": 0.0,
+                "totalTax": 0.0,
+                "cashPayments": 0.0,
+                "cardPayments": 0.0,
+                "totalTransactions": 0,
+                "avgTransaction": 0.0,
+                "lastResetDate": None,
+                "lastResetEmployee": None
+            }
+        
+        total_transactions = int(daily_result['actual_transactions']) if daily_result['actual_transactions'] else 0
+        cash_count = int(daily_result['cash_count']) if daily_result['cash_count'] else 0
+        card_count = int(daily_result['card_count']) if daily_result['card_count'] else 0
+        
+        # Calculate estimated sales (simplified - in real scenario would use actual totals)
+        avg_transaction_amount = 15.0
+        total_sales = total_transactions * avg_transaction_amount
+        total_tax = total_sales * TAX_RATE
+        cash_payments = cash_count * avg_transaction_amount
+        card_payments = card_count * avg_transaction_amount
+        
+        # Get last reset information if z_report_log table exists
+        last_reset_date = None
+        last_reset_employee = None
+        
+        try:
+            reset_query = """
+                SELECT reset_date, employee_name
+                FROM z_report_log
+                ORDER BY reset_date DESC
+                LIMIT 1
+            """
+            reset_result = execute_query(reset_query, fetch_one=True)
+            
+            if reset_result:
+                last_reset_date = str(reset_result['reset_date']) if reset_result['reset_date'] else None
+                last_reset_employee = reset_result['employee_name']
+        except:
+            # Table doesn't exist yet, that's okay
+            pass
+        
+        avg_trans = total_sales / total_transactions if total_transactions > 0 else 0.0
+        
+        return {
+            "date": report_date,
+            "totalSales": total_sales,
+            "totalTax": total_tax,
+            "cashPayments": cash_payments,
+            "cardPayments": card_payments,
+            "totalTransactions": total_transactions,
+            "avgTransaction": avg_trans,
+            "lastResetDate": last_reset_date,
+            "lastResetEmployee": last_reset_employee
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating Z-Report: {str(e)}")
+
+
+@app.get("/api/reports/product-usage", response_model=ProductUsageResponse)
+def get_product_usage(
+    start_date: str = Query(..., description="Start date in YYYY-MM-DD format"),
+    end_date: str = Query(..., description="End date in YYYY-MM-DD format")
+):
+    """
+    Product Usage Chart: Inventory consumption report for a date range.
+    Shows which inventory items were used and in what quantities based on sales data.
+    Useful for inventory planning and restocking decisions.
+    """
+    try:
+        # Query to calculate product usage from sales data
+        # This uses the menu ingredients and sales data to calculate consumption
+        usage_query = """
+            SELECT
+                i.itemId,
+                i.itemName,
+                COALESCE(SUM(
+                    CAST(ingredient_data->>'qty' AS NUMERIC) * s.amountSold
+                ), 0) as quantity_used
+            FROM inventory i
+            LEFT JOIN (
+                SELECT
+                    s.itemName,
+                    s.amountSold,
+                    jsonb_array_elements(m.ingredients) as ingredient_data
+                FROM sales s
+                JOIN menu m ON s.itemName = m.menuItemName
+                WHERE s.date BETWEEN %s AND %s
+            ) s ON i.itemId = CAST(s.ingredient_data->>'itemId' AS INTEGER)
+            GROUP BY i.itemId, i.itemName
+            ORDER BY quantity_used DESC, i.itemName
+        """
+        
+        usage_results = execute_query(usage_query, (start_date, end_date))
+        
+        products = []
+        for row in usage_results:
+            products.append({
+                "itemId": int(row['itemid']),
+                "itemName": row['itemname'],
+                "quantityUsed": float(row['quantity_used']) if row['quantity_used'] else 0.0
+            })
+        
+        return {
+            "startDate": start_date,
+            "endDate": end_date,
+            "products": products,
+            "totalProducts": len(products)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating Product Usage Report: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

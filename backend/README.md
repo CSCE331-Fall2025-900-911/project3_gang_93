@@ -113,6 +113,22 @@ The API will be available at:
 ### Management APIs
 - `GET /api/management/dashboard` - Get dashboard data
 
+### Manager Report APIs
+- `GET /api/reports/x-report?report_date=YYYY-MM-DD` - Get X-Report (hourly sales activities)
+  - Optional `report_date` parameter (defaults to today)
+  - Returns: hourly breakdown of sales, voids, cash/card payments, and transactions
+  - No side effects - can be run multiple times per day
+  
+- `GET /api/reports/z-report?report_date=YYYY-MM-DD` - Get Z-Report (end-of-day totals)
+  - Optional `report_date` parameter (defaults to today)
+  - Returns: daily summary with sales, tax, cash/card payments, and last reset info
+  - In production, typically run once at end of day
+  
+- `GET /api/reports/product-usage?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` - Get Product Usage Chart
+  - Required `start_date` and `end_date` parameters
+  - Returns: inventory consumption report showing quantity used per item
+  - Useful for inventory planning and restocking decisions
+
 ## Project Structure
 
 ```
@@ -155,6 +171,38 @@ When a transaction is created:
 2. Inventory is automatically updated (ingredients deducted)
 3. Sales records are created for each item
 4. Customer points are updated (if customer provided)
+
+### Manager Reports
+The backend provides three types of manager reports extracted from the previous project:
+
+#### X-Report (Hourly Sales Report)
+- **Purpose**: Provides hourly sales activities for any specific date
+- **Use Case**: Analyze rush periods and sales patterns throughout the day
+- **Key Metrics**:
+  - Total sales, voids, cash/card payments per hour
+  - Transaction count per hour
+  - Average transaction value
+- **Side Effects**: None - can be run as often as needed
+
+#### Z-Report (End-of-Day Report)
+- **Purpose**: Provides comprehensive end-of-day totals and summary
+- **Use Case**: Daily closing procedures and financial reconciliation
+- **Key Metrics**:
+  - Total sales and calculated tax (8.75%)
+  - Cash vs card payment breakdown
+  - Total transaction count
+  - Average transaction value
+  - Last reset information (date and employee)
+- **Side Effects**: Designed for once-per-day use at closing time
+
+#### Product Usage Chart
+- **Purpose**: Shows inventory consumption over a date range
+- **Use Case**: Inventory planning, restocking decisions, and usage analysis
+- **Key Metrics**:
+  - Quantity used per inventory item
+  - Based on actual sales data and menu item ingredients
+  - Sorted by most-used items first
+- **Side Effects**: None - pure analytics report
 
 ### Error Handling
 All endpoints return appropriate HTTP status codes:

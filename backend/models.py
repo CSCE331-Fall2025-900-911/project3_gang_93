@@ -148,3 +148,48 @@ class ErrorResponse(BaseModel):
     error: str
     code: Optional[str] = None
 
+# ================== MANAGER REPORT MODELS ==================
+
+# X-Report Models (Hourly Sales Report)
+class XReportHourlyData(BaseModel):
+    hour: int
+    sales: Decimal
+    voids: Decimal
+    cash: Decimal
+    card: Decimal
+    transactions: int
+
+class XReportResponse(BaseModel):
+    date: str
+    totalSales: Decimal
+    totalVoids: Decimal
+    cashPayments: Decimal
+    cardPayments: Decimal
+    totalTransactions: int
+    avgTransaction: Decimal
+    hourlyData: List[XReportHourlyData]
+
+# Z-Report Models (End-of-Day Report)
+class ZReportResponse(BaseModel):
+    date: str
+    totalSales: Decimal
+    totalTax: Decimal
+    cashPayments: Decimal
+    cardPayments: Decimal
+    totalTransactions: int
+    avgTransaction: Decimal
+    lastResetDate: Optional[str] = None
+    lastResetEmployee: Optional[str] = None
+
+# Product Usage Chart Models
+class ProductUsageData(BaseModel):
+    itemId: int
+    itemName: str
+    quantityUsed: Decimal
+
+class ProductUsageResponse(BaseModel):
+    startDate: str
+    endDate: str
+    products: List[ProductUsageData]
+    totalProducts: int
+
