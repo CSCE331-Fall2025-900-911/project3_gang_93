@@ -114,6 +114,41 @@ def load_menu(cursor):
             ))
             count += 1
         print(f"  Loaded {count} menu items")
+        
+def load_add_ons(cursor):
+    """Load add-ons from CSV (handles JSONB ingredients)"""
+    print("Loading add-ons...")
+    with open(os.path.join(DATA_DIR, 'addOns.csv'), 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        count = 0
+        for row in reader:
+            # Parse ingredients JSON string
+            ingredients_str = row['ingredients']
+            try:
+                # If it's already a JSON string, parse it
+                if isinstance(ingredients_str, str):
+                    ingredients = json.loads(ingredients_str)
+                else:
+                    ingredients = ingredients_str
+            except json.JSONDecodeError:
+                print(f"  Warning: Invalid JSON in ingredients for addOnID {row['addOnID']}")
+                continue
+            
+            cursor.execute("""
+                INSERT INTO addOns 
+                (addOnID, addOnName, price, ingredients)
+                VALUES (%s, %s, %s, %s::jsonb)
+                ON CONFLICT (addOnID) DO NOTHING
+            """, (
+                int(row['addOnID']),
+                row['addOnName'],
+                float(row['price']),
+                json.dumps(ingredients)
+            ))
+
+            count += 1
+
+        print(f"  Loaded {count} add-on items")
 
 def load_sales(cursor):
     """Load sales from CSV"""

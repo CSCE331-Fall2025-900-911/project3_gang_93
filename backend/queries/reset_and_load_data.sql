@@ -10,6 +10,7 @@
 DROP TABLE IF EXISTS transactions CASCADE;
 DROP TABLE IF EXISTS sales CASCADE;
 DROP TABLE IF EXISTS menu CASCADE;
+DROP TABLE IF EXISTS addOns CASCADE;
 DROP TABLE IF EXISTS inventory CASCADE;
 DROP TABLE IF EXISTS employees CASCADE;
 DROP TABLE IF EXISTS customerRewards CASCADE;
@@ -55,6 +56,14 @@ CREATE TABLE menu (
     ingredients JSONB NOT NULL
 );
 
+-- Add-Ons Table
+CREATE TABLE addOns (
+    addOnID INT PRIMARY KEY,
+    addOnName VARCHAR(100) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL CHECK (price > 0),
+    ingredients JSONB NOT NULL
+);
+
 -- Sales Table
 CREATE TABLE sales (
     saleId INT PRIMARY KEY,
@@ -82,13 +91,18 @@ CREATE TABLE transactions (
 CREATE INDEX idx_customer_email ON customerRewards(email);
 CREATE INDEX idx_customer_phone ON customerRewards(phoneNumber);
 CREATE INDEX idx_customer_points ON customerRewards(points DESC);
+
 CREATE INDEX idx_employee_auth ON employees(authLevel);
+
 CREATE INDEX idx_sales_date ON sales(date);
 CREATE INDEX idx_sales_item ON sales(itemName);
+
 CREATE INDEX idx_transactions_date ON transactions(date);
 CREATE INDEX idx_transactions_customer ON transactions(customerId);
 CREATE INDEX idx_transactions_type ON transactions(transactionType);
+
 CREATE INDEX idx_menu_ingredients ON menu USING GIN (ingredients);
+CREATE INDEX idx_addOns_ingredients ON addOns USING GIN (ingredients);
 CREATE INDEX idx_transactions_items ON transactions USING GIN (items);
 
 -- =====================================================
@@ -99,6 +113,7 @@ COMMENT ON TABLE customerRewards IS 'Customer loyalty program members and their 
 COMMENT ON TABLE employees IS 'Employee records with authorization levels';
 COMMENT ON TABLE inventory IS 'Inventory items and current quantities';
 COMMENT ON TABLE menu IS 'Menu items with pricing and ingredient requirements';
+COMMENT ON TABLE addOns IS 'Add-on items with pricing and ingredient requirements';
 COMMENT ON TABLE sales IS 'Historical sales data by item';
 COMMENT ON TABLE transactions IS 'Transaction records with customer and item details';
 
@@ -121,6 +136,9 @@ COMMENT ON TABLE transactions IS 'Transaction records with customer and item det
 -- For menu, you may need to use a different approach if the CSV has JSON strings
 \copy menu(menuItemId, menuItemName, price, ingredients) FROM 'menu.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',');
 
+-- Load Add-Ons (Note: ingredients is JSONB)
+\copy addOns(addOnID, addOnName, price, ingredients) FROM 'addOns.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
 -- Load Sales
 \copy sales(saleId, itemName, amountSold, date, time) FROM 'sales.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',');
 
@@ -139,6 +157,8 @@ UNION ALL
 SELECT 'inventory', COUNT(*) FROM inventory
 UNION ALL
 SELECT 'menu', COUNT(*) FROM menu
+UNION ALL
+SELECT 'addOns', COUNT(*) FROM addOns
 UNION ALL
 SELECT 'sales', COUNT(*) FROM sales
 UNION ALL

@@ -1,6 +1,6 @@
 """Pydantic models for request/response validation"""
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Literal
 from datetime import date, time
 from decimal import Decimal
 
@@ -14,10 +14,24 @@ class MenuItem(BaseModel):
 class MenuResponse(BaseModel):
     menuItems: List[MenuItem]
 
+# Add-On Models
+class AddOnItem(BaseModel):
+    addOnID: int
+    addOnName: str
+    price: Decimal
+    ingredients: Any  # JSONB field
+
+class AddOnResponse(BaseModel):
+    addOns: List[AddOnItem]
+
 # Transaction Models
 class TransactionItem(BaseModel):
     menuItemId: int
+    addOnIDs: List[int] = None
     quantity: int
+
+    ice: Literal["light", "normal", "extra"]
+    sweetness: Literal["0%", "25%", "50%", "75%", "100%"]
 
 class TransactionCreate(BaseModel):
     customerId: Optional[int] = None

@@ -1,0 +1,6 @@
+addOnID,addOnName,price,ingredients
+201,Tapioca Pearls (oz),0.50,"[{""itemId"":2016,""qty"":1.0}]"
+202,Lychee Jelly (oz),0.50,"[{""itemId"":2017,""qty"":0.5}]"
+203,Lychee Pops (oz),0.75,"[{""itemId"":2018,""qty"":0.5}]"
+204,Mango Pops (oz),0.75,"[{""itemId"":2019,""qty"":0.5}]"
+205,Simple Syrup (oz),0.00,"[{""itemId"":2012,""qty"":0.5}]"

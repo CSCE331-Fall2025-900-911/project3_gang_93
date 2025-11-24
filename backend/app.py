@@ -82,6 +82,24 @@ def get_menu_item(menu_item_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+# ================== ADD-ON APIs ==================
+
+@app.get("/api/addons", response_model=AddOnResponse)
+def get_add_ons():
+    try:
+        addons = execute_query("SELECT addOnID, addOnName, price, ingredients FROM addOns ORDER BY addOnID")
+        formatted = []
+        for a in addons:
+            formatted.append({
+                "addOnID": a["addonid"],
+                "addOnName": a["addonname"],
+                "price": float(a["price"]),
+                "ingredients": a["ingredients"]
+            })
+        return {"addOns": formatted}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 # ================== TRANSACTION APIs ==================
 
 def process_inventory_and_sales(inventory_updates, sales_records, trans_date, trans_time):
@@ -151,12 +169,44 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                 FROM menu 
                 WHERE menuItemId IN ({placeholders})
             """
+
             cursor.execute(menu_query, tuple(menu_item_ids))
             menu_items = cursor.fetchall()
+
+            cursor.execute("SELECT * FROM addOns")
+            addon_items = cursor.fetchall()
             
             # Create lookup dictionary
             menu_dict = {item['menuitemid']: item for item in menu_items}
+            addon_dict = {item['addonid']: item for item in addon_items}
             
+            SIMPLE_SYRUP_ID = None # Find Simple Syrup ID
+            BASE_SYRUP_QTY = None # 100% sweetness qty
+
+            # Find Simple Syrup ID and qty from addOns
+            for addon in addon_dict.values():
+                name = addon["addonname"].lower()
+
+                if "simple syrup" in name:
+                    syrup_ing = addon['ingredients']
+                    
+                    if isinstance(syrup_ing, str):
+                        syrup_ing = json.loads(syrup_ing)
+
+                    SIMPLE_SYRUP_ID = syrup_ing[0]["itemId"]
+                    BASE_SYRUP_QTY = float(syrup_ing[0]["qty"])
+
+                    break
+
+            # Sweetness == syrup multiplier
+            SWEETNESS_MULTIPLIERS = {
+                "0%": 0.0,
+                "25%": 0.25,
+                "50%": 0.5,
+                "75%": 0.75,
+                "100%": 1.0
+            }
+
             # Calculate total and prepare data
             total = 0.0
             items_with_prices = []
@@ -173,7 +223,10 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                 total += item_total
                 items_with_prices.append({
                     "menuItemId": item.menuItemId,
-                    "quantity": item.quantity
+                    "quantity": item.quantity,
+                    "addOnIDs": item.addOnIDs,
+                    "ice": item.ice,
+                    "sweetness": item.sweetness
                 })
                 
                 # Prepare inventory updates (for background processing)
@@ -185,9 +238,7 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                     for ingredient in ingredients:
                         item_id = ingredient['itemId']
                         qty_to_deduct = ingredient['qty'] * item.quantity
-                        if item_id not in inventory_updates:
-                            inventory_updates[item_id] = 0
-                        inventory_updates[item_id] += qty_to_deduct
+                        inventory_updates[item_id] = inventory_updates.get(item_id, 0) + qty_to_deduct
                 
                 # Prepare sales records (for background processing)
                 sales_records.append({
@@ -195,6 +246,35 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                     'quantity': item.quantity
                 })
             
+                for addOnID in item.addOnIDs:
+                    addon = addon_dict.get(addOnID)
+                    if not addon:
+                        continue
+
+                    total += float(addon['price']) * item.quantity
+
+                    addon_ing = addon['ingredients']
+                    if isinstance(addon_ing, str):
+                        addon_ing = json.loads(addon_ing)
+
+                    for ing in addon_ing:
+                        item_id = ing['itemId']
+                        qty_to_deduct = ing['qty'] * item.quantity
+                        inventory_updates[item_id] = inventory_updates.get(item_id, 0) + qty_to_deduct
+
+
+                    sales_records.append({
+                        "itemName": addon["addonname"],
+                        "quantity": item.quantity
+                    })
+
+                if SIMPLE_SYRUP_ID is not None and BASE_SYRUP_QTY is not None:
+                    factor = SWEETNESS_MULTIPLIERS[item.sweetness]
+                    syrup_qty = BASE_SYRUP_QTY * factor * item.quantity
+                    inventory_updates[SIMPLE_SYRUP_ID] = (
+                        inventory_updates.get(SIMPLE_SYRUP_ID, 0) + syrup_qty
+                    )
+
             # Add tip to total
             tip_amount = float(transaction.tip) if transaction.tip else 0.0
             total += tip_amount
@@ -314,13 +394,38 @@ def get_transactions(
                 items = items_data if isinstance(items_data, list) else []
                 tip = 0.0
             
-            # Calculate total
+            # Collect all addOnIDs used in this transaction
+            add_on_ids = set()
+            for item in items:
+                for add_id in item.get("addOnIDs", []):
+                    add_on_ids.add(add_id)
+
+            # Batch-load add-on prices
+            add_on_prices = {}
+            if add_on_ids:
+                placeholders = ",".join(["%s"] * len(add_on_ids))
+                addon_price_query = f"""
+                    SELECT addOnID, price
+                    FROM addOns
+                    WHERE addOnID IN ({placeholders})
+                """
+                addon_rows = execute_query(addon_price_query, tuple(add_on_ids))
+                add_on_prices = {row["addonid"]: float(row["price"]) for row in addon_rows}
+
+            # Calculate total (including add-ons)
             total = 0.0
             for item in items:
+                # base drink
                 price_query = "SELECT price FROM menu WHERE menuItemId = %s"
                 menu_item = execute_query(price_query, (item['menuItemId'],), fetch_one=True)
                 if menu_item:
                     total += float(menu_item['price']) * item['quantity']
+
+                # add-ons
+                for add_id in item.get("addOnIDs", []):
+                    add_price = add_on_prices.get(add_id)
+                    if add_price is not None:
+                        total += add_price * item["quantity"]
             
             # Add tip to total
             total += float(tip)
@@ -374,11 +479,38 @@ def get_transaction(transaction_id: int):
         
         # Calculate total
         total = 0.0
+
+        # Collect all addOnIDs
+        add_on_ids = set()
         for item in items:
+            for add_id in item.get("addOnIDs", []):
+                add_on_ids.add(add_id)
+
+        # Batch-load add-on prices
+        add_on_prices = {}
+        if add_on_ids:
+            placeholders = ",".join(["%s"] * len(add_on_ids))
+            addon_price_query = f"""
+                SELECT addOnID, price
+                FROM addOns
+                WHERE addOnID IN ({placeholders})
+            """
+            addon_rows = execute_query(addon_price_query, tuple(add_on_ids))
+            add_on_prices = {row["addonid"]: float(row["price"]) for row in addon_rows}
+
+        # Calculate total (including add-ons)
+        for item in items:
+            # base drink
             price_query = "SELECT price FROM menu WHERE menuItemId = %s"
             menu_item = execute_query(price_query, (item['menuItemId'],), fetch_one=True)
             if menu_item:
                 total += float(menu_item['price']) * item['quantity']
+
+            # add-ons
+            for add_id in item.get("addOnIDs", []):
+                add_price = add_on_prices.get(add_id)
+                if add_price is not None:
+                    total += add_price * item["quantity"]
         
         # Add tip to total
         total += float(tip)
@@ -711,7 +843,16 @@ def get_sales(
             })
         
         # Calculate totals
-        total_query = "SELECT COUNT(*) as count, SUM(s.amountSold * m.price) as revenue FROM sales s JOIN menu m ON s.itemName = m.menuItemName WHERE 1=1"
+        total_query = """
+            SELECT 
+                COUNT(*) as count,
+                SUM(s.amountSold * COALESCE(m.price, a.price)) as revenue
+            FROM sales s
+            LEFT JOIN menu m ON s.itemName = m.menuItemName
+            LEFT JOIN addOns a ON s.itemName = a.addOnName
+            WHERE 1=1
+        """
+
         total_params = []
         
         if date:
@@ -755,10 +896,11 @@ def get_sales_summary(
         totals_query = f"""
             SELECT 
                 COUNT(*) as total_sales,
-                SUM(s.amountSold * m.price) as total_revenue,
-                AVG(s.amountSold * m.price) as avg_order_value
+                SUM(s.amountSold * COALESCE(m.price, a.price)) as total_revenue,
+                AVG(s.amountSold * COALESCE(m.price, a.price)) as avg_order_value
             FROM sales s
-            JOIN menu m ON s.itemName = m.menuItemName
+            LEFT JOIN menu m ON s.itemName = m.menuItemName
+            LEFT JOIN addOns a ON s.itemName = a.addOnName
             WHERE {date_condition}
         """
         totals = execute_query(totals_query, tuple(params), fetch_one=True)
@@ -768,14 +910,16 @@ def get_sales_summary(
             SELECT 
                 s.itemName,
                 SUM(s.amountSold) as quantity,
-                SUM(s.amountSold * m.price) as revenue
+                SUM(s.amountSold * COALESCE(m.price, a.price)) as revenue
             FROM sales s
-            JOIN menu m ON s.itemName = m.menuItemName
+            LEFT JOIN menu m ON s.itemName = m.menuItemName
+            LEFT JOIN addOns a ON s.itemName = a.addOnName
             WHERE {date_condition}
             GROUP BY s.itemName
             ORDER BY revenue DESC
             LIMIT 10
         """
+
         top_items = execute_query(top_items_query, tuple(params))
         
         formatted_top_items = []
@@ -791,9 +935,10 @@ def get_sales_summary(
             SELECT 
                 s.date,
                 COUNT(*) as sales,
-                SUM(s.amountSold * m.price) as revenue
+                SUM(s.amountSold * COALESCE(m.price, a.price)) as revenue
             FROM sales s
-            JOIN menu m ON s.itemName = m.menuItemName
+            LEFT JOIN menu m ON s.itemName = m.menuItemName
+            LEFT JOIN addOns a ON s.itemName = a.addOnName
             WHERE {date_condition}
             GROUP BY s.date
             ORDER BY s.date DESC
@@ -917,9 +1062,12 @@ def get_management_dashboard():
     try:
         # Today's sales
         today_sales_query = """
-            SELECT SUM(s.amountSold * m.price) as revenue, COUNT(*) as transactions
+            SELECT 
+                SUM(s.amountSold * COALESCE(m.price, a.price)) as revenue, 
+                COUNT(*) as transactions
             FROM sales s
-            JOIN menu m ON s.itemName = m.menuItemName
+            LEFT JOIN menu m ON s.itemName = m.menuItemName
+            LEFT JOIN addOns a ON s.itemName = a.addOnName
             WHERE s.date = CURRENT_DATE
         """
         today = execute_query(today_sales_query, fetch_one=True)

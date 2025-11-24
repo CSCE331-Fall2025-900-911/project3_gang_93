@@ -56,4 +56,3 @@ def execute_insert(query, params=None, return_id=True):
             result = cursor.fetchone()
             return result if result else None
         return None
-
