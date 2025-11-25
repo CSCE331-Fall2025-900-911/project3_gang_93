@@ -332,11 +332,22 @@ def get_transactions(
                 menu_item_id = item.get('menuItemId') if isinstance(item, dict) else getattr(item, 'menuItemId', None)
                 quantity = item.get('quantity') if isinstance(item, dict) else getattr(item, 'quantity', 0)
                 
+                # Calculate base drink price
                 if menu_item_id:
                     price_query = "SELECT price FROM menu WHERE menuItemId = %s"
                     menu_item = execute_query(price_query, (menu_item_id,), fetch_one=True)
                     if menu_item:
                         total += float(menu_item['price']) * quantity
+                
+                # Calculate add-on prices
+                add_on_ids = item.get('addOnIDs') if isinstance(item, dict) else getattr(item, 'addOnIDs', None)
+                if add_on_ids and isinstance(add_on_ids, list) and len(add_on_ids) > 0:
+                    # Batch fetch all add-on prices
+                    placeholders = ','.join(['%s'] * len(add_on_ids))
+                    addon_query = f"SELECT menuItemId, price FROM menu WHERE menuItemId IN ({placeholders})"
+                    addon_items = execute_query(addon_query, tuple(add_on_ids))
+                    for addon in addon_items:
+                        total += float(addon['price']) * quantity  # Add-on price multiplied by item quantity
             
             # Add tip to total
             total += float(tip)
@@ -395,11 +406,22 @@ def get_transaction(transaction_id: int):
             menu_item_id = item.get('menuItemId') if isinstance(item, dict) else getattr(item, 'menuItemId', None)
             quantity = item.get('quantity') if isinstance(item, dict) else getattr(item, 'quantity', 0)
             
+            # Calculate base drink price
             if menu_item_id:
                 price_query = "SELECT price FROM menu WHERE menuItemId = %s"
                 menu_item = execute_query(price_query, (menu_item_id,), fetch_one=True)
                 if menu_item:
                     total += float(menu_item['price']) * quantity
+            
+            # Calculate add-on prices
+            add_on_ids = item.get('addOnIDs') if isinstance(item, dict) else getattr(item, 'addOnIDs', None)
+            if add_on_ids and isinstance(add_on_ids, list) and len(add_on_ids) > 0:
+                # Batch fetch all add-on prices
+                placeholders = ','.join(['%s'] * len(add_on_ids))
+                addon_query = f"SELECT menuItemId, price FROM menu WHERE menuItemId IN ({placeholders})"
+                addon_items = execute_query(addon_query, tuple(add_on_ids))
+                for addon in addon_items:
+                    total += float(addon['price']) * quantity  # Add-on price multiplied by item quantity
         
         # Add tip to total
         total += float(tip)
