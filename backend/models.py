@@ -27,7 +27,7 @@ class AddOnResponse(BaseModel):
 # Transaction Models
 class TransactionItem(BaseModel):
     menuItemId: int
-    addOnIDs: List[int] = None
+    addOnIDs: Optional[List[int]] = None
     quantity: int
 
     ice: Literal["light", "normal", "extra"]
