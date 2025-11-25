@@ -1,11 +1,11 @@
 import NavButton from './NavButton'
 import './Header.css'
 
-function Header({ viewMode, onViewModeChange }) {
+function Header({ viewMode, onViewModeChange, onManagerClick }) {
   const navItems = [
     { icon: '🔍', label: 'Toggle Size' },
     { icon: '🕐', label: 'Transaction History' },
-    { icon: '⚙️', label: 'Manage' },
+    { icon: '⚙️', label: 'Manage', onClick: onManagerClick },
     { icon: '📤', label: 'Log Out' },
   ]
 
@@ -25,7 +25,11 @@ function Header({ viewMode, onViewModeChange }) {
         </div>
         {navItems.map((item, index) => (
           <div key={index} className="nav-item-wrapper">
-            <NavButton icon={item.icon} label={item.label} />
+            <NavButton 
+              icon={item.icon} 
+              label={item.label} 
+              onClick={item.onClick}
+            />
             {index < navItems.length - 1 && <span className="nav-divider">|</span>}
           </div>
         ))}

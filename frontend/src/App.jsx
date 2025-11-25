@@ -6,6 +6,7 @@ import { API_BASE_URL } from "./config/api";
 import PaymentSelector from "./components/PaymentSelector";
 import AlertModal from "./components/AlertModal";
 import KioskView from "./components/KioskView";
+import ManagerView from "./components/ManagerView";
 import "./App.css";
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
   const [popupOpen, setPopupOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState(null);
   const [viewMode, setViewMode] = useState("cashier"); // "cashier" or "kiosk"
+  const [showManager, setShowManager] = useState(false);
 
   // Fetch menu items from backend on component mount
   useEffect(() => {
@@ -152,6 +154,11 @@ function App() {
     setViewMode((prev) => (prev === "cashier" ? "kiosk" : "cashier"));
   };
 
+  // Show manager view if requested
+  if (showManager) {
+    return <ManagerView onBack={() => setShowManager(false)} />;
+  }
+
   if (loading) {
     return (
       <div className="app">
@@ -236,7 +243,11 @@ function App() {
   // Cashier View
   return (
     <div className="app">
-      <Header viewMode={viewMode} onViewModeChange={toggleViewMode} />
+      <Header
+        viewMode={viewMode}
+        onViewModeChange={toggleViewMode}
+        onManagerClick={() => setShowManager(true)}
+      />
       <main className="main-content">
         <MenuGrid items={menuItems} onAddToCart={addToCart} />
         <OrderPanel
