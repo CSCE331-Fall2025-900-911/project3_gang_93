@@ -16,7 +16,9 @@ async function apiRequest(endpoint, options = {}) {
   };
 
   try {
+    console.log(`[API] Making request to: ${url}`);
     const response = await fetch(url, config);
+    console.log(`[API] Response status: ${response.status} for ${url}`);
 
     if (!response.ok) {
       const errorData = await response
@@ -85,12 +87,25 @@ export const menuAPI = {
 export const transactionAPI = {
   // Create a new transaction
   create: async (transactionData) => {
-    // Transform frontend cart to backend format
-    // transactionData.items is an object with item IDs as keys
-    const items = Object.values(transactionData.items || {}).map((item) => ({
-      menuItemId: item.menuItemId || item.id,
-      quantity: item.quantity || 1,
-    }));
+      // Transform frontend cart to backend format
+      // transactionData.items is an object with item IDs as keys
+      const items = Object.values(transactionData.items || {}).map((item) => {
+        const itemData = {
+          menuItemId: item.menuItemId || item.id,
+          quantity: item.quantity || 1,
+        };
+        // Include optional customization fields if present
+        if (item.ice !== undefined && item.ice !== null) {
+          itemData.ice = item.ice;
+        }
+        if (item.sweetness !== undefined && item.sweetness !== null) {
+          itemData.sweetness = item.sweetness;
+        }
+        if (item.addOnIDs !== undefined && item.addOnIDs !== null) {
+          itemData.addOnIDs = item.addOnIDs;
+        }
+        return itemData;
+      });
 
     // Build payload - backend will automatically set date/time to current values
     const payload = {

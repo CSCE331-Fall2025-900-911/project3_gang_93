@@ -18,6 +18,10 @@ class MenuResponse(BaseModel):
 class TransactionItem(BaseModel):
     menuItemId: int
     quantity: int
+    # Optional customization fields
+    ice: Optional[str] = None  # e.g., "extra", "light", "normal", "no ice"
+    sweetness: Optional[str] = None  # e.g., "0%", "25%", "50%", "75%", "100%"
+    addOnIDs: Optional[List[int]] = None  # List of add-on item IDs
 
 class TransactionCreate(BaseModel):
     customerId: Optional[int] = None

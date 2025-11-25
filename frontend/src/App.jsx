@@ -23,14 +23,16 @@ function App() {
   useEffect(() => {
     const fetchMenu = async () => {
       try {
+        console.log("[App] Starting menu fetch...");
         setLoading(true);
         const items = await menuAPI.getAll();
+        console.log("[App] Menu fetched successfully:", items.length, "items");
         setMenuItems(items);
         setError(null);
       } catch (err) {
-        console.error("Failed to fetch menu:", err);
+        console.error("[App] Failed to fetch menu:", err);
         setError(
-          "Failed to load menu. Please make sure the backend server is running."
+          `Failed to load menu: ${err.message || 'Unknown error'}. Please make sure the backend server is running at ${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}.`
         );
       } finally {
         setLoading(false);

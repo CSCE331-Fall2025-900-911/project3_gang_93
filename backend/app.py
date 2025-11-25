@@ -171,10 +171,21 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                 # Calculate price
                 item_total = float(menu_item['price']) * item.quantity
                 total += item_total
-                items_with_prices.append({
+                
+                # Preserve all item fields including add-ons, ice, sweetness, etc.
+                item_data = {
                     "menuItemId": item.menuItemId,
                     "quantity": item.quantity
-                })
+                }
+                # Include optional customization fields if present
+                if item.ice is not None:
+                    item_data["ice"] = item.ice
+                if item.sweetness is not None:
+                    item_data["sweetness"] = item.sweetness
+                if item.addOnIDs is not None:
+                    item_data["addOnIDs"] = item.addOnIDs
+                
+                items_with_prices.append(item_data)
                 
                 # Prepare inventory updates (for background processing)
                 ingredients = menu_item['ingredients']
@@ -317,10 +328,15 @@ def get_transactions(
             # Calculate total
             total = 0.0
             for item in items:
-                price_query = "SELECT price FROM menu WHERE menuItemId = %s"
-                menu_item = execute_query(price_query, (item['menuItemId'],), fetch_one=True)
-                if menu_item:
-                    total += float(menu_item['price']) * item['quantity']
+                # Handle both dict and object formats, extract menuItemId safely
+                menu_item_id = item.get('menuItemId') if isinstance(item, dict) else getattr(item, 'menuItemId', None)
+                quantity = item.get('quantity') if isinstance(item, dict) else getattr(item, 'quantity', 0)
+                
+                if menu_item_id:
+                    price_query = "SELECT price FROM menu WHERE menuItemId = %s"
+                    menu_item = execute_query(price_query, (menu_item_id,), fetch_one=True)
+                    if menu_item:
+                        total += float(menu_item['price']) * quantity
             
             # Add tip to total
             total += float(tip)
@@ -330,7 +346,7 @@ def get_transactions(
                 "date": t['date'],
                 "time": t['time'],
                 "customerId": t['customerid'],
-                "items": items,
+                "items": items,  # Preserve all fields including add-ons
                 "transactionType": t['transactiontype'],
                 "total": total
             })
@@ -375,10 +391,15 @@ def get_transaction(transaction_id: int):
         # Calculate total
         total = 0.0
         for item in items:
-            price_query = "SELECT price FROM menu WHERE menuItemId = %s"
-            menu_item = execute_query(price_query, (item['menuItemId'],), fetch_one=True)
-            if menu_item:
-                total += float(menu_item['price']) * item['quantity']
+            # Handle both dict and object formats, extract menuItemId safely
+            menu_item_id = item.get('menuItemId') if isinstance(item, dict) else getattr(item, 'menuItemId', None)
+            quantity = item.get('quantity') if isinstance(item, dict) else getattr(item, 'quantity', 0)
+            
+            if menu_item_id:
+                price_query = "SELECT price FROM menu WHERE menuItemId = %s"
+                menu_item = execute_query(price_query, (menu_item_id,), fetch_one=True)
+                if menu_item:
+                    total += float(menu_item['price']) * quantity
         
         # Add tip to total
         total += float(tip)
@@ -388,7 +409,7 @@ def get_transaction(transaction_id: int):
             "date": transaction['date'],
             "time": transaction['time'],
             "customerId": transaction['customerid'],
-            "items": items,
+            "items": items,  # Preserve all fields including add-ons (ice, sweetness, addOnIDs)
             "transactionType": transaction['transactiontype'],
             "total": total
         }
