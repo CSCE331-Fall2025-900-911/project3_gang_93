@@ -149,6 +149,47 @@ def load_menu(cursor):
         
         print(f"  ✅ Loaded {count} menu items, skipped {skipped} duplicates")
 
+def load_addons(cursor):
+    """Load add-ons from CSV (handles JSONB ingredients)"""
+    print("Loading add-ons...")
+    with open(os.path.join(DATA_DIR, 'addOns.csv'), 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        count = 0
+        skipped = 0
+        for row in reader:
+            # Parse ingredients JSON string
+            ingredients_str = row['ingredients']
+            try:
+                if isinstance(ingredients_str, str):
+                    ingredients = json.loads(ingredients_str)
+                else:
+                    ingredients = ingredients_str
+            except json.JSONDecodeError:
+                print(f"  ⚠️  Invalid JSON in ingredients for addOnID {row['addOnID']}")
+                continue
+            
+            try:
+                cursor.execute("""
+                    INSERT INTO addOns 
+                    (addOnID, addOnName, price, ingredients)
+                    VALUES (%s, %s, %s, %s::jsonb)
+                """, (
+                    int(row['addOnID']),
+                    row['addOnName'],
+                    float(row['price']),
+                    json.dumps(ingredients)
+                ))
+                count += 1
+            except errors.UniqueViolation:
+                skipped += 1
+                print(f"  ⚠️  Skipped duplicate: addOnID={row['addOnID']}")
+                cursor.connection.rollback()
+            except Exception as e:
+                print(f"  ❌ Error on addOnID {row['addOnID']}: {e}")
+                cursor.connection.rollback()
+        
+        print(f"  ✅ Loaded {count} add-on items, skipped {skipped} duplicates")
+
 def load_sales(cursor):
     """Load sales from CSV"""
     print("Loading sales (this may take a while)...")
@@ -385,6 +426,7 @@ def main():
         'employees.csv',
         'inventory.csv',
         'menu.csv',
+        'addOns.csv',
         'sales.csv',
         'transactions.csv'
     ]
@@ -416,6 +458,9 @@ def main():
         conn.commit()
         
         load_menu(cursor)
+        conn.commit()
+        
+        load_addons(cursor)
         conn.commit()
         
         load_sales(cursor)

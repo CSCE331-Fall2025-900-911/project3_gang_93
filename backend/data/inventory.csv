@@ -1,20 +1,20 @@
-itemId,itemName,quantity,label
-2001,Black Tea Leaves (oz),32,ingredient
-2002,Oolong Tea Leaves (oz),32,ingredient
-2003,Green Tea Leaves (oz),32,ingredient
-2004,Matcha Powder (oz),16,ingredient
-2005,Taro Powder (oz),8,ingredient
-2006,Mango Syrup (oz),32,ingredient
-2007,Lychee Syrup (oz),32,ingredient
-2008,Passion Fruit Syrup (oz),32,ingredient
-2009,Strawberry Syrup (oz),32,ingredient
-2010,Watermelon Syrup (oz),32,ingredient
-2011,Coffee Syrup (oz),32,ingredient
-2012,Simple Syrup (oz),64,ingredient
-2013,Brown Sugar Syrup (oz),16,ingredient
-2014,Milk 1% (gallons),10,ingredient
-2015,Creamer (gallons),2,ingredient
-2016,Tapioca Pearls (oz),60,add-on
-2017,Lychee Jelly (oz),20,add-on
-2018,Lychee Pops (oz),20,add-on
-2019,Mango Pops (oz),20,add-on
+itemId,itemName,quantity
+2001,Black Tea Leaves (oz),32
+2002,Oolong Tea Leaves (oz),32
+2003,Green Tea Leaves (oz),32
+2004,Matcha Powder (oz),16
+2005,Taro Powder (oz),8
+2006,Mango Syrup (oz),32
+2007,Lychee Syrup (oz),32
+2008,Passion Fruit Syrup (oz),32
+2009,Strawberry Syrup (oz),32
+2010,Watermelon Syrup (oz),32
+2011,Coffee Syrup (oz),32
+2012,Simple Syrup (oz),64
+2013,Brown Sugar Syrup (oz),16
+2014,Milk 1% (gallons),10
+2015,Creamer (gallons),2
+2016,Tapioca Pearls (oz),60
+2017,Lychee Jelly (oz),20
+2018,Lychee Pops (oz),20
+2019,Mango Pops (oz),20

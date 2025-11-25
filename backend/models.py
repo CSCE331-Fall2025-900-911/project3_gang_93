@@ -14,14 +14,28 @@ class MenuItem(BaseModel):
 class MenuResponse(BaseModel):
     menuItems: List[MenuItem]
 
+# Add-On Models
+class AddOnItem(BaseModel):
+    addOnID: int
+    addOnName: str
+    price: Decimal
+    ingredients: Any  # JSONB field
+
+class AddOnResponse(BaseModel):
+    addOns: List[AddOnItem]
+
 # Transaction Models
 class TransactionItem(BaseModel):
     menuItemId: int
+    addOnIDs: Optional[List[int]] = None
     quantity: int
     # Optional customization fields
     ice: Optional[str] = None  # e.g., "extra", "light", "normal", "no ice"
     sweetness: Optional[str] = None  # e.g., "0%", "25%", "50%", "75%", "100%"
     addOnIDs: Optional[List[int]] = None  # List of add-on item IDs
+
+    ice: Literal["light", "normal", "extra"]
+    sweetness: Literal["0%", "25%", "50%", "75%", "100%"]
 
 class TransactionCreate(BaseModel):
     customerId: Optional[int] = None
