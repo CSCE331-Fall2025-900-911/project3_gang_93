@@ -14,5 +14,6 @@ export const API_ENDPOINTS = {
   EMPLOYEES: '/api/employees',
   AUTH: '/api/auth',
   MANAGEMENT: '/api/management',
+  REPORTS: '/api/reports',
 };
 

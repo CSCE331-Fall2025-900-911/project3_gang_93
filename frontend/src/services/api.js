@@ -16,13 +16,30 @@ async function apiRequest(endpoint, options = {}) {
   };
 
   try {
+    console.log(`[API] Making request to: ${url}`);
     const response = await fetch(url, config);
+    console.log(`[API] Response status: ${response.status} for ${url}`);
 
     if (!response.ok) {
-      const error = await response
+      const errorData = await response
         .json()
-        .catch(() => ({ error: response.statusText }));
-      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+        .catch(() => ({ detail: response.statusText }));
+      
+      // Handle FastAPI validation errors (422) - detail is an array
+      if (errorData.detail) {
+        if (Array.isArray(errorData.detail)) {
+          // Format validation errors nicely
+          const errorMessages = errorData.detail.map(err => 
+            `${err.loc?.join('.') || 'field'}: ${err.msg || err}`
+          ).join(', ');
+          throw new Error(errorMessages || `Validation error: ${response.status}`);
+        } else {
+          throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        }
+      }
+      
+      // Handle other error formats
+      throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
     }
 
     return await response.json();
@@ -70,12 +87,25 @@ export const menuAPI = {
 export const transactionAPI = {
   // Create a new transaction
   create: async (transactionData) => {
-    // Transform frontend cart to backend format
-    // transactionData.items is an object with item IDs as keys
-    const items = Object.values(transactionData.items || {}).map((item) => ({
-      menuItemId: item.menuItemId || item.id,
-      quantity: item.quantity || 1,
-    }));
+      // Transform frontend cart to backend format
+      // transactionData.items is an object with item IDs as keys
+      const items = Object.values(transactionData.items || {}).map((item) => {
+        const itemData = {
+          menuItemId: item.menuItemId || item.id,
+          quantity: item.quantity || 1,
+        };
+        // Include optional customization fields if present
+        if (item.ice !== undefined && item.ice !== null) {
+          itemData.ice = item.ice;
+        }
+        if (item.sweetness !== undefined && item.sweetness !== null) {
+          itemData.sweetness = item.sweetness;
+        }
+        if (item.addOnIDs !== undefined && item.addOnIDs !== null) {
+          itemData.addOnIDs = item.addOnIDs;
+        }
+        return itemData;
+      });
 
     // Build payload - backend will automatically set date/time to current values
     const payload = {
@@ -150,6 +180,138 @@ export const customerAPI = {
 };
 
 /**
+ * Inventory API
+ */
+export const inventoryAPI = {
+  getAll: async () => {
+    return await apiRequest(API_ENDPOINTS.INVENTORY);
+  },
+  getById: async (id) => {
+    return await apiRequest(`${API_ENDPOINTS.INVENTORY}/${id}`);
+  },
+  update: async (id, quantity, reason = null) => {
+    // Ensure quantity is a valid number
+    const quantityValue = typeof quantity === 'number' ? quantity : parseFloat(quantity);
+    
+    if (isNaN(quantityValue) || quantityValue < 0) {
+      throw new Error("Invalid quantity value. Must be a non-negative number.");
+    }
+    
+    const payload = { 
+      quantity: quantityValue,
+    };
+    
+    // Only include reason if it's provided and not empty
+    if (reason !== null && reason !== undefined && reason.trim() !== '') {
+      payload.reason = reason;
+    }
+    
+    return await apiRequest(`${API_ENDPOINTS.INVENTORY}/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+  getLowStock: async (threshold = 10) => {
+    return await apiRequest(
+      `${API_ENDPOINTS.INVENTORY}/low-stock?threshold=${threshold}`
+    );
+  },
+};
+
+/**
+ * Sales API
+ */
+export const salesAPI = {
+  getAll: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.date) params.append("date", filters.date);
+    if (filters.startDate) params.append("startDate", filters.startDate);
+    if (filters.endDate) params.append("endDate", filters.endDate);
+    if (filters.itemName) params.append("itemName", filters.itemName);
+    if (filters.limit) params.append("limit", filters.limit);
+
+    const queryString = params.toString();
+    const endpoint = queryString
+      ? `${API_ENDPOINTS.SALES}?${queryString}`
+      : API_ENDPOINTS.SALES;
+    return await apiRequest(endpoint);
+  },
+  getSummary: async (startDate = null, endDate = null) => {
+    const params = new URLSearchParams();
+    if (startDate) params.append("startDate", startDate);
+    if (endDate) params.append("endDate", endDate);
+    const queryString = params.toString();
+    const endpoint = queryString
+      ? `${API_ENDPOINTS.SALES}/summary?${queryString}`
+      : `${API_ENDPOINTS.SALES}/summary`;
+    return await apiRequest(endpoint);
+  },
+};
+
+/**
+ * Reports API
+ */
+export const reportsAPI = {
+  getXReport: async (reportDate = null) => {
+    const endpoint = reportDate
+      ? `${API_ENDPOINTS.REPORTS}/x-report?report_date=${reportDate}`
+      : `${API_ENDPOINTS.REPORTS}/x-report`;
+    return await apiRequest(endpoint);
+  },
+  getZReport: async (reportDate = null) => {
+    const endpoint = reportDate
+      ? `${API_ENDPOINTS.REPORTS}/z-report?report_date=${reportDate}`
+      : `${API_ENDPOINTS.REPORTS}/z-report`;
+    return await apiRequest(endpoint);
+  },
+  getProductUsage: async (startDate, endDate) => {
+    return await apiRequest(
+      `${API_ENDPOINTS.REPORTS}/product-usage?start_date=${startDate}&end_date=${endDate}`
+    );
+  },
+};
+
+/**
+ * Management API
+ */
+export const managementAPI = {
+  getDashboard: async () => {
+    return await apiRequest(`${API_ENDPOINTS.MANAGEMENT}/dashboard`);
+  },
+};
+
+/**
+ * Employee API
+ */
+export const employeeAPI = {
+  getAll: async () => {
+    return await apiRequest(API_ENDPOINTS.EMPLOYEES);
+  },
+  getById: async (id) => {
+    return await apiRequest(`${API_ENDPOINTS.EMPLOYEES}/${id}`);
+  },
+};
+
+/**
+ * Customer API - Extended
+ */
+export const customerAPIExtended = {
+  ...customerAPI,
+  create: async (customerData) => {
+    return await apiRequest(API_ENDPOINTS.CUSTOMERS, {
+      method: "POST",
+      body: JSON.stringify(customerData),
+    });
+  },
+  updatePoints: async (id, points, reason = null) => {
+    return await apiRequest(`${API_ENDPOINTS.CUSTOMERS}/${id}/points`, {
+      method: "PUT",
+      body: JSON.stringify({ points, reason }),
+    });
+  },
+};
+
+/**
  * Test API connection
  */
 export const testConnection = async () => {
@@ -165,6 +327,11 @@ export const testConnection = async () => {
 export default {
   menuAPI,
   transactionAPI,
-  customerAPI,
+  customerAPI: customerAPIExtended,
+  inventoryAPI,
+  salesAPI,
+  reportsAPI,
+  managementAPI,
+  employeeAPI,
   testConnection,
 };

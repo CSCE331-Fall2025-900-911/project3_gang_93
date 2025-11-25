@@ -1,6 +1,6 @@
 """Pydantic models for request/response validation"""
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List, Any, Literal
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Optional, List, Any, Union
 from datetime import date, time
 from decimal import Decimal
 
@@ -29,6 +29,10 @@ class TransactionItem(BaseModel):
     menuItemId: int
     addOnIDs: Optional[List[int]] = None
     quantity: int
+    # Optional customization fields
+    ice: Optional[str] = None  # e.g., "extra", "light", "normal", "no ice"
+    sweetness: Optional[str] = None  # e.g., "0%", "25%", "50%", "75%", "100%"
+    addOnIDs: Optional[List[int]] = None  # List of add-on item IDs
 
     ice: Literal["light", "normal", "extra"]
     sweetness: Literal["0%", "25%", "50%", "75%", "100%"]
@@ -102,8 +106,19 @@ class InventoryResponse(BaseModel):
     inventory: List[InventoryItem]
 
 class UpdateInventory(BaseModel):
-    quantity: Decimal
+    quantity: Union[Decimal, float, int, str]
     reason: Optional[str] = None
+    
+    @field_validator('quantity', mode='before')
+    @classmethod
+    def validate_quantity(cls, v):
+        """Convert quantity to Decimal, accepting number or string"""
+        if v is None:
+            raise ValueError("quantity is required")
+        try:
+            return Decimal(str(v))
+        except (ValueError, TypeError):
+            raise ValueError(f"Invalid quantity value: {v}")
 
 # Sales Models
 class SaleItem(BaseModel):
@@ -161,4 +176,49 @@ class LoginResponse(BaseModel):
 class ErrorResponse(BaseModel):
     error: str
     code: Optional[str] = None
+
+# ================== MANAGER REPORT MODELS ==================
+
+# X-Report Models (Hourly Sales Report)
+class XReportHourlyData(BaseModel):
+    hour: int
+    sales: Decimal
+    voids: Decimal
+    cash: Decimal
+    card: Decimal
+    transactions: int
+
+class XReportResponse(BaseModel):
+    date: str
+    totalSales: Decimal
+    totalVoids: Decimal
+    cashPayments: Decimal
+    cardPayments: Decimal
+    totalTransactions: int
+    avgTransaction: Decimal
+    hourlyData: List[XReportHourlyData]
+
+# Z-Report Models (End-of-Day Report)
+class ZReportResponse(BaseModel):
+    date: str
+    totalSales: Decimal
+    totalTax: Decimal
+    cashPayments: Decimal
+    cardPayments: Decimal
+    totalTransactions: int
+    avgTransaction: Decimal
+    lastResetDate: Optional[str] = None
+    lastResetEmployee: Optional[str] = None
+
+# Product Usage Chart Models
+class ProductUsageData(BaseModel):
+    itemId: int
+    itemName: str
+    quantityUsed: Decimal
+
+class ProductUsageResponse(BaseModel):
+    startDate: str
+    endDate: str
+    products: List[ProductUsageData]
+    totalProducts: int
 

@@ -221,7 +221,9 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                 # Calculate price
                 item_total = float(menu_item['price']) * item.quantity
                 total += item_total
-                items_with_prices.append({
+                
+                # Preserve all item fields including add-ons, ice, sweetness, etc.
+                item_data = {
                     "menuItemId": item.menuItemId,
                     "quantity": item.quantity,
                     "addOnIDs": item.addOnIDs,
@@ -435,7 +437,7 @@ def get_transactions(
                 "date": t['date'],
                 "time": t['time'],
                 "customerId": t['customerid'],
-                "items": items,
+                "items": items,  # Preserve all fields including add-ons
                 "transactionType": t['transactiontype'],
                 "total": total
             })
@@ -520,7 +522,7 @@ def get_transaction(transaction_id: int):
             "date": transaction['date'],
             "time": transaction['time'],
             "customerId": transaction['customerid'],
-            "items": items,
+            "items": items,  # Preserve all fields including add-ons (ice, sweetness, addOnIDs)
             "transactionType": transaction['transactiontype'],
             "total": total
         }
@@ -728,6 +730,31 @@ def get_inventory():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+@app.get("/api/inventory/low-stock", response_model=InventoryResponse)
+def get_low_stock_items(threshold: float = Query(10.0, description="Low stock threshold")):
+    """Get items with low stock"""
+    try:
+        query = """
+            SELECT itemId, itemName, quantity
+            FROM inventory
+            WHERE quantity < %s
+            ORDER BY quantity ASC
+        """
+        items = execute_query(query, (threshold,))
+        
+        formatted_items = []
+        for item in items:
+            formatted_items.append({
+                "itemId": item['itemid'],
+                "itemName": item['itemname'],
+                "quantity": float(item['quantity'])
+            })
+        
+        return {"inventory": formatted_items}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 @app.get("/api/inventory/{item_id}", response_model=InventoryItem)
 def get_inventory_item(item_id: int):
     """Get a specific inventory item by ID"""
@@ -773,31 +800,6 @@ def update_inventory_item(item_id: int, update: UpdateInventory):
         
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-
-@app.get("/api/inventory/low-stock", response_model=InventoryResponse)
-def get_low_stock_items(threshold: float = Query(10.0, description="Low stock threshold")):
-    """Get items with low stock"""
-    try:
-        query = """
-            SELECT itemId, itemName, quantity
-            FROM inventory
-            WHERE quantity < %s
-            ORDER BY quantity ASC
-        """
-        items = execute_query(query, (threshold,))
-        
-        formatted_items = []
-        for item in items:
-            formatted_items.append({
-                "itemId": item['itemid'],
-                "itemName": item['itemname'],
-                "quantity": float(item['quantity'])
-            })
-        
-        return {"inventory": formatted_items}
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
@@ -1060,6 +1062,9 @@ def get_employee(employee_id: int):
 def get_management_dashboard():
     """Get management dashboard data"""
     try:
+        # Get today's date in local timezone (not UTC)
+        today_date = datetime.now().date()
+        
         # Today's sales
         today_sales_query = """
             SELECT 
@@ -1070,7 +1075,7 @@ def get_management_dashboard():
             LEFT JOIN addOns a ON s.itemName = a.addOnName
             WHERE s.date = CURRENT_DATE
         """
-        today = execute_query(today_sales_query, fetch_one=True)
+        today = execute_query(today_sales_query, (today_date,), fetch_one=True)
         
         # Low stock items
         low_stock_query = "SELECT COUNT(*) as count FROM inventory WHERE quantity < 10"
@@ -1089,12 +1094,12 @@ def get_management_dashboard():
         top_items_query = """
             SELECT s.itemName, SUM(s.amountSold) as quantity
             FROM sales s
-            WHERE s.date = CURRENT_DATE
+            WHERE s.date = %s
             GROUP BY s.itemName
             ORDER BY quantity DESC
             LIMIT 5
         """
-        top_items = execute_query(top_items_query)
+        top_items = execute_query(top_items_query, (today_date,))
         
         return {
             "todaySales": float(today['revenue']) if today and today['revenue'] else 0.0,
@@ -1106,6 +1111,508 @@ def get_management_dashboard():
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+# ================== MANAGER REPORT APIs ==================
+
+@app.get("/api/reports/x-report", response_model=XReportResponse)
+def get_x_report(report_date: Optional[str] = Query(None, description="Report date in YYYY-MM-DD format")):
+    """
+    X-Report: Hourly sales activities for a specific date.
+    Provides insights into rush periods and sales patterns throughout the day.
+    Can be run as often as desired with no side effects.
+    """
+    try:
+        # Use today if no date provided
+        if not report_date:
+            report_date = datetime.now().strftime('%Y-%m-%d')
+        
+        # Get daily totals
+        daily_query = """
+            SELECT
+                COUNT(*) as total_transactions,
+                COUNT(CASE WHEN transactionType != 'void' THEN 1 END) as actual_transactions,
+                COUNT(CASE WHEN transactionType = 'void' THEN 1 END) as void_transactions,
+                COUNT(CASE WHEN transactionType = 'cash' THEN 1 END) as cash_count,
+                COUNT(CASE WHEN transactionType = 'card' THEN 1 END) as card_count
+            FROM transactions
+            WHERE date = %s
+        """
+        
+        daily_result = execute_query(daily_query, (report_date,), fetch_one=True)
+        
+        if not daily_result:
+            # No data for this date
+            return {
+                "date": report_date,
+                "totalSales": 0.0,
+                "totalVoids": 0.0,
+                "cashPayments": 0.0,
+                "cardPayments": 0.0,
+                "totalTransactions": 0,
+                "avgTransaction": 0.0,
+                "hourlyData": []
+            }
+        
+        total_transactions = int(daily_result['actual_transactions']) if daily_result['actual_transactions'] else 0
+        void_transactions = int(daily_result['void_transactions']) if daily_result['void_transactions'] else 0
+        cash_count = int(daily_result['cash_count']) if daily_result['cash_count'] else 0
+        card_count = int(daily_result['card_count']) if daily_result['card_count'] else 0
+        
+        # Calculate actual sales totals from transaction items
+        # Handle both formats: items as list directly, or items as dict with 'items' key
+        totals_query = """
+            SELECT
+                SUM(
+                    COALESCE(
+                        (SELECT SUM(m.price * (item->>'quantity')::int)
+                         FROM jsonb_array_elements(
+                             CASE 
+                                 WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                                 ELSE t.items->'items'
+                             END
+                         ) AS item
+                         LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+                         WHERE m.menuItemId IS NOT NULL),
+                        0
+                    ) + COALESCE(
+                        CASE 
+                            WHEN jsonb_typeof(t.items) = 'object' THEN (t.items->>'tip')::numeric
+                            ELSE 0
+                        END, 0
+                    )
+                ) as total_sales,
+                SUM(
+                    CASE WHEN t.transactionType = 'cash' THEN
+                        COALESCE(
+                            (SELECT SUM(m.price * (item->>'quantity')::int)
+                             FROM jsonb_array_elements(
+                                 CASE 
+                                     WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                                     ELSE t.items->'items'
+                                 END
+                             ) AS item
+                             LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+                             WHERE m.menuItemId IS NOT NULL),
+                            0
+                        ) + COALESCE(
+                            CASE 
+                                WHEN jsonb_typeof(t.items) = 'object' THEN (t.items->>'tip')::numeric
+                                ELSE 0
+                            END, 0
+                        )
+                    ELSE 0 END
+                ) as cash_total,
+                SUM(
+                    CASE WHEN t.transactionType = 'card' THEN
+                        COALESCE(
+                            (SELECT SUM(m.price * (item->>'quantity')::int)
+                             FROM jsonb_array_elements(
+                                 CASE 
+                                     WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                                     ELSE t.items->'items'
+                                 END
+                             ) AS item
+                             LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+                             WHERE m.menuItemId IS NOT NULL),
+                            0
+                        ) + COALESCE(
+                            CASE 
+                                WHEN jsonb_typeof(t.items) = 'object' THEN (t.items->>'tip')::numeric
+                                ELSE 0
+                            END, 0
+                        )
+                    ELSE 0 END
+                ) as card_total
+            FROM transactions t
+            WHERE t.date = %s AND t.transactionType != 'void'
+        """
+        
+        totals_result = execute_query(totals_query, (report_date,), fetch_one=True)
+        
+        total_sales = float(totals_result['total_sales']) if totals_result and totals_result['total_sales'] else 0.0
+        cash_payments = float(totals_result['cash_total']) if totals_result and totals_result['cash_total'] else 0.0
+        card_payments = float(totals_result['card_total']) if totals_result and totals_result['card_total'] else 0.0
+        
+        # Calculate void totals
+        void_totals_query = """
+            SELECT
+                SUM(
+                    COALESCE(
+                        (SELECT SUM(m.price * (item->>'quantity')::int)
+                         FROM jsonb_array_elements(
+                             CASE 
+                                 WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                                 ELSE t.items->'items'
+                             END
+                         ) AS item
+                         LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+                         WHERE m.menuItemId IS NOT NULL),
+                        0
+                    ) + COALESCE(
+                        CASE 
+                            WHEN jsonb_typeof(t.items) = 'object' THEN (t.items->>'tip')::numeric
+                            ELSE 0
+                        END, 0
+                    )
+                ) as void_total
+            FROM transactions t
+            WHERE t.date = %s AND t.transactionType = 'void'
+        """
+        
+        void_totals_result = execute_query(void_totals_query, (report_date,), fetch_one=True)
+        total_voids = float(void_totals_result['void_total']) if void_totals_result and void_totals_result['void_total'] else 0.0
+        
+        # Calculate average transaction amount
+        avg_transaction_amount = total_sales / total_transactions if total_transactions > 0 else 0.0
+        
+        # Get hourly breakdown with actual totals
+        hourly_query = """
+            SELECT
+                EXTRACT(HOUR FROM t.time) as hour,
+                COUNT(CASE WHEN t.transactionType != 'void' THEN 1 END) as sales_count,
+                COUNT(CASE WHEN t.transactionType = 'void' THEN 1 END) as void_count,
+                SUM(
+                    CASE WHEN t.transactionType != 'void' THEN
+                        COALESCE(
+                            (SELECT SUM(m.price * (item->>'quantity')::int)
+                             FROM jsonb_array_elements(
+                                 CASE 
+                                     WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                                     ELSE t.items->'items'
+                                 END
+                             ) AS item
+                             LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+                             WHERE m.menuItemId IS NOT NULL),
+                            0
+                        ) + COALESCE(
+                            CASE 
+                                WHEN jsonb_typeof(t.items) = 'object' THEN (t.items->>'tip')::numeric
+                                ELSE 0
+                            END, 0
+                        )
+                    ELSE 0 END
+                ) as sales_total,
+                SUM(
+                    CASE WHEN t.transactionType = 'void' THEN
+                        COALESCE(
+                            (SELECT SUM(m.price * (item->>'quantity')::int)
+                             FROM jsonb_array_elements(
+                                 CASE 
+                                     WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                                     ELSE t.items->'items'
+                                 END
+                             ) AS item
+                             LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+                             WHERE m.menuItemId IS NOT NULL),
+                            0
+                        ) + COALESCE(
+                            CASE 
+                                WHEN jsonb_typeof(t.items) = 'object' THEN (t.items->>'tip')::numeric
+                                ELSE 0
+                            END, 0
+                        )
+                    ELSE 0 END
+                ) as void_total,
+                SUM(
+                    CASE WHEN t.transactionType = 'cash' THEN
+                        COALESCE(
+                            (SELECT SUM(m.price * (item->>'quantity')::int)
+                             FROM jsonb_array_elements(
+                                 CASE 
+                                     WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                                     ELSE t.items->'items'
+                                 END
+                             ) AS item
+                             LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+                             WHERE m.menuItemId IS NOT NULL),
+                            0
+                        ) + COALESCE(
+                            CASE 
+                                WHEN jsonb_typeof(t.items) = 'object' THEN (t.items->>'tip')::numeric
+                                ELSE 0
+                            END, 0
+                        )
+                    ELSE 0 END
+                ) as cash_total,
+                SUM(
+                    CASE WHEN t.transactionType = 'card' THEN
+                        COALESCE(
+                            (SELECT SUM(m.price * (item->>'quantity')::int)
+                             FROM jsonb_array_elements(
+                                 CASE 
+                                     WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                                     ELSE t.items->'items'
+                                 END
+                             ) AS item
+                             LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+                             WHERE m.menuItemId IS NOT NULL),
+                            0
+                        ) + COALESCE(
+                            CASE 
+                                WHEN jsonb_typeof(t.items) = 'object' THEN (t.items->>'tip')::numeric
+                                ELSE 0
+                            END, 0
+                        )
+                    ELSE 0 END
+                ) as card_total
+            FROM transactions t
+            WHERE t.date = %s
+            GROUP BY EXTRACT(HOUR FROM t.time)
+            ORDER BY hour
+        """
+        
+        hourly_results = execute_query(hourly_query, (report_date,))
+        
+        hourly_data = []
+        for row in hourly_results:
+            hour = int(row['hour'])
+            sales_count = int(row['sales_count']) if row['sales_count'] else 0
+            void_count = int(row['void_count']) if row['void_count'] else 0
+            sales_total = float(row['sales_total']) if row['sales_total'] else 0.0
+            void_total = float(row['void_total']) if row['void_total'] else 0.0
+            cash_total = float(row['cash_total']) if row['cash_total'] else 0.0
+            card_total = float(row['card_total']) if row['card_total'] else 0.0
+            
+            hourly_data.append({
+                "hour": hour,
+                "sales": sales_total,
+                "voids": void_total,
+                "cash": cash_total,
+                "card": card_total,
+                "transactions": sales_count
+            })
+        
+        avg_trans = total_sales / total_transactions if total_transactions > 0 else 0.0
+        
+        return {
+            "date": report_date,
+            "totalSales": total_sales,
+            "totalVoids": total_voids,
+            "cashPayments": cash_payments,
+            "cardPayments": card_payments,
+            "totalTransactions": total_transactions,
+            "avgTransaction": avg_trans,
+            "hourlyData": hourly_data
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating X-Report: {str(e)}")
+
+
+@app.get("/api/reports/z-report", response_model=ZReportResponse)
+def get_z_report(report_date: Optional[str] = Query(None, description="Report date in YYYY-MM-DD format")):
+    """
+    Z-Report: End-of-day totals and summary.
+    Provides comprehensive daily sales information including tax calculations.
+    Note: In production, this would typically be run once at end of day.
+    """
+    try:
+        # Use today if no date provided
+        if not report_date:
+            report_date = datetime.now().strftime('%Y-%m-%d')
+        
+        # Tax rate (8.75%)
+        TAX_RATE = 0.0875
+        
+        # Get daily totals
+        daily_query = """
+            SELECT
+                COUNT(*) as total_transactions,
+                COUNT(CASE WHEN transactionType != 'void' THEN 1 END) as actual_transactions,
+                COUNT(CASE WHEN transactionType = 'cash' THEN 1 END) as cash_count,
+                COUNT(CASE WHEN transactionType = 'card' THEN 1 END) as card_count
+            FROM transactions
+            WHERE date = %s
+        """
+        
+        daily_result = execute_query(daily_query, (report_date,), fetch_one=True)
+        
+        if not daily_result:
+            # No data for this date
+            return {
+                "date": report_date,
+                "totalSales": 0.0,
+                "totalTax": 0.0,
+                "cashPayments": 0.0,
+                "cardPayments": 0.0,
+                "totalTransactions": 0,
+                "avgTransaction": 0.0,
+                "lastResetDate": None,
+                "lastResetEmployee": None
+            }
+        
+        total_transactions = int(daily_result['actual_transactions']) if daily_result['actual_transactions'] else 0
+        cash_count = int(daily_result['cash_count']) if daily_result['cash_count'] else 0
+        card_count = int(daily_result['card_count']) if daily_result['card_count'] else 0
+        
+        # Calculate actual sales totals from transaction items
+        # Handle both formats: items as list directly, or items as dict with 'items' key
+        totals_query = """
+            SELECT
+                SUM(
+                    COALESCE(
+                        (SELECT SUM(m.price * (item->>'quantity')::int)
+                         FROM jsonb_array_elements(
+                             CASE 
+                                 WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                                 ELSE t.items->'items'
+                             END
+                         ) AS item
+                         LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+                         WHERE m.menuItemId IS NOT NULL),
+                        0
+                    ) + COALESCE(
+                        CASE 
+                            WHEN jsonb_typeof(t.items) = 'object' THEN (t.items->>'tip')::numeric
+                            ELSE 0
+                        END, 0
+                    )
+                ) as total_sales,
+                SUM(
+                    CASE WHEN t.transactionType = 'cash' THEN
+                        COALESCE(
+                            (SELECT SUM(m.price * (item->>'quantity')::int)
+                             FROM jsonb_array_elements(
+                                 CASE 
+                                     WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                                     ELSE t.items->'items'
+                                 END
+                             ) AS item
+                             LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+                             WHERE m.menuItemId IS NOT NULL),
+                            0
+                        ) + COALESCE(
+                            CASE 
+                                WHEN jsonb_typeof(t.items) = 'object' THEN (t.items->>'tip')::numeric
+                                ELSE 0
+                            END, 0
+                        )
+                    ELSE 0 END
+                ) as cash_total,
+                SUM(
+                    CASE WHEN t.transactionType = 'card' THEN
+                        COALESCE(
+                            (SELECT SUM(m.price * (item->>'quantity')::int)
+                             FROM jsonb_array_elements(
+                                 CASE 
+                                     WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                                     ELSE t.items->'items'
+                                 END
+                             ) AS item
+                             LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+                             WHERE m.menuItemId IS NOT NULL),
+                            0
+                        ) + COALESCE(
+                            CASE 
+                                WHEN jsonb_typeof(t.items) = 'object' THEN (t.items->>'tip')::numeric
+                                ELSE 0
+                            END, 0
+                        )
+                    ELSE 0 END
+                ) as card_total
+            FROM transactions t
+            WHERE t.date = %s AND t.transactionType != 'void'
+        """
+        
+        totals_result = execute_query(totals_query, (report_date,), fetch_one=True)
+        
+        total_sales = float(totals_result['total_sales']) if totals_result and totals_result['total_sales'] else 0.0
+        cash_payments = float(totals_result['cash_total']) if totals_result and totals_result['cash_total'] else 0.0
+        card_payments = float(totals_result['card_total']) if totals_result and totals_result['card_total'] else 0.0
+        total_tax = total_sales * TAX_RATE
+        
+        # Get last reset information if z_report_log table exists
+        last_reset_date = None
+        last_reset_employee = None
+        
+        try:
+            reset_query = """
+                SELECT reset_date, employee_name
+                FROM z_report_log
+                ORDER BY reset_date DESC
+                LIMIT 1
+            """
+            reset_result = execute_query(reset_query, fetch_one=True)
+            
+            if reset_result:
+                last_reset_date = str(reset_result['reset_date']) if reset_result['reset_date'] else None
+                last_reset_employee = reset_result['employee_name']
+        except:
+            # Table doesn't exist yet, that's okay
+            pass
+        
+        avg_trans = total_sales / total_transactions if total_transactions > 0 else 0.0
+        
+        return {
+            "date": report_date,
+            "totalSales": total_sales,
+            "totalTax": total_tax,
+            "cashPayments": cash_payments,
+            "cardPayments": card_payments,
+            "totalTransactions": total_transactions,
+            "avgTransaction": avg_trans,
+            "lastResetDate": last_reset_date,
+            "lastResetEmployee": last_reset_employee
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating Z-Report: {str(e)}")
+
+
+@app.get("/api/reports/product-usage", response_model=ProductUsageResponse)
+def get_product_usage(
+    start_date: str = Query(..., description="Start date in YYYY-MM-DD format"),
+    end_date: str = Query(..., description="End date in YYYY-MM-DD format")
+):
+    """
+    Product Usage Chart: Inventory consumption report for a date range.
+    Shows which inventory items were used and in what quantities based on sales data.
+    Useful for inventory planning and restocking decisions.
+    """
+    try:
+        # Query to calculate product usage from sales data
+        # This uses the menu ingredients and sales data to calculate consumption
+        # Note: BETWEEN is inclusive, so same start and end date will include that entire day
+        usage_query = """
+            SELECT
+                i.itemId,
+                i.itemName,
+                COALESCE(SUM(
+                    CAST(ingredient_data->>'qty' AS NUMERIC) * s.amountSold
+                ), 0) as quantity_used
+            FROM inventory i
+            LEFT JOIN (
+                SELECT
+                    s.itemName,
+                    s.amountSold,
+                    jsonb_array_elements(m.ingredients) as ingredient_data
+                FROM sales s
+                JOIN menu m ON s.itemName = m.menuItemName
+                WHERE s.date >= %s AND s.date <= %s
+            ) s ON i.itemId = CAST(s.ingredient_data->>'itemId' AS INTEGER)
+            GROUP BY i.itemId, i.itemName
+            ORDER BY quantity_used DESC, i.itemName
+        """
+        
+        usage_results = execute_query(usage_query, (start_date, end_date))
+        
+        products = []
+        for row in usage_results:
+            products.append({
+                "itemId": int(row['itemid']),
+                "itemName": row['itemname'],
+                "quantityUsed": float(row['quantity_used']) if row['quantity_used'] else 0.0
+            })
+        
+        return {
+            "startDate": start_date,
+            "endDate": end_date,
+            "products": products,
+            "totalProducts": len(products)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating Product Usage Report: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

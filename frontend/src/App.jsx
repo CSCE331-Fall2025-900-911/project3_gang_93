@@ -6,6 +6,7 @@ import { API_BASE_URL } from "./config/api";
 import PaymentSelector from "./components/PaymentSelector";
 import AlertModal from "./components/AlertModal";
 import KioskView from "./components/KioskView";
+import ManagerView from "./components/ManagerView";
 import "./App.css";
 
 function App() {
@@ -16,19 +17,22 @@ function App() {
   const [popupOpen, setPopupOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState(null);
   const [viewMode, setViewMode] = useState("cashier"); // "cashier" or "kiosk"
+  const [showManager, setShowManager] = useState(false);
 
   // Fetch menu items from backend on component mount
   useEffect(() => {
     const fetchMenu = async () => {
       try {
+        console.log("[App] Starting menu fetch...");
         setLoading(true);
         const items = await menuAPI.getAll();
+        console.log("[App] Menu fetched successfully:", items.length, "items");
         setMenuItems(items);
         setError(null);
       } catch (err) {
-        console.error("Failed to fetch menu:", err);
+        console.error("[App] Failed to fetch menu:", err);
         setError(
-          "Failed to load menu. Please make sure the backend server is running."
+          `Failed to load menu: ${err.message || 'Unknown error'}. Please make sure the backend server is running at ${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}.`
         );
       } finally {
         setLoading(false);
@@ -152,6 +156,11 @@ function App() {
     setViewMode((prev) => (prev === "cashier" ? "kiosk" : "cashier"));
   };
 
+  // Show manager view if requested
+  if (showManager) {
+    return <ManagerView onBack={() => setShowManager(false)} />;
+  }
+
   if (loading) {
     return (
       <div className="app">
@@ -236,7 +245,11 @@ function App() {
   // Cashier View
   return (
     <div className="app">
-      <Header viewMode={viewMode} onViewModeChange={toggleViewMode} />
+      <Header
+        viewMode={viewMode}
+        onViewModeChange={toggleViewMode}
+        onManagerClick={() => setShowManager(true)}
+      />
       <main className="main-content">
         <MenuGrid items={menuItems} onAddToCart={addToCart} />
         <OrderPanel
