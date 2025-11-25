@@ -19,10 +19,25 @@ async function apiRequest(endpoint, options = {}) {
     const response = await fetch(url, config);
 
     if (!response.ok) {
-      const error = await response
+      const errorData = await response
         .json()
-        .catch(() => ({ error: response.statusText }));
-      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+        .catch(() => ({ detail: response.statusText }));
+      
+      // Handle FastAPI validation errors (422) - detail is an array
+      if (errorData.detail) {
+        if (Array.isArray(errorData.detail)) {
+          // Format validation errors nicely
+          const errorMessages = errorData.detail.map(err => 
+            `${err.loc?.join('.') || 'field'}: ${err.msg || err}`
+          ).join(', ');
+          throw new Error(errorMessages || `Validation error: ${response.status}`);
+        } else {
+          throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        }
+      }
+      
+      // Handle other error formats
+      throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
     }
 
     return await response.json();
@@ -160,9 +175,25 @@ export const inventoryAPI = {
     return await apiRequest(`${API_ENDPOINTS.INVENTORY}/${id}`);
   },
   update: async (id, quantity, reason = null) => {
+    // Ensure quantity is a valid number
+    const quantityValue = typeof quantity === 'number' ? quantity : parseFloat(quantity);
+    
+    if (isNaN(quantityValue) || quantityValue < 0) {
+      throw new Error("Invalid quantity value. Must be a non-negative number.");
+    }
+    
+    const payload = { 
+      quantity: quantityValue,
+    };
+    
+    // Only include reason if it's provided and not empty
+    if (reason !== null && reason !== undefined && reason.trim() !== '') {
+      payload.reason = reason;
+    }
+    
     return await apiRequest(`${API_ENDPOINTS.INVENTORY}/${id}`, {
       method: "PUT",
-      body: JSON.stringify({ quantity, reason }),
+      body: JSON.stringify(payload),
     });
   },
   getLowStock: async (threshold = 10) => {

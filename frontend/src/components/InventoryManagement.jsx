@@ -21,6 +21,7 @@ function InventoryManagement() {
     try {
       setLoading(true);
       const data = await inventoryAPI.getAll();
+      console.log("Inventory API response:", data); // Debug log
       setInventory(data.inventory || []);
       setError(null);
     } catch (err) {
@@ -37,12 +38,18 @@ function InventoryManagement() {
       setLowStockItems(data.inventory || []);
     } catch (err) {
       console.error("Failed to fetch low stock:", err);
+      // Set empty array on error to prevent crashes
+      setLowStockItems([]);
     }
   };
 
   const handleEdit = (item) => {
     setEditingItem(item);
-    setEditQuantity(item.quantity.toString());
+    // Safely convert quantity to number then to string
+    const quantity = typeof item.quantity === 'number' 
+      ? item.quantity 
+      : parseFloat(item.quantity) || 0;
+    setEditQuantity(quantity.toString());
     setEditReason("");
   };
 
@@ -73,6 +80,8 @@ function InventoryManagement() {
   };
 
   const displayedItems = filter === "low" ? lowStockItems : inventory;
+
+  console.log("InventoryManagement render:", { loading, inventory: inventory.length, lowStockItems: lowStockItems.length, displayedItems: displayedItems.length }); // Debug log
 
   if (loading) {
     return (
@@ -123,28 +132,38 @@ function InventoryManagement() {
                 </td>
               </tr>
             ) : (
-              displayedItems.map((item) => (
-                <tr
-                  key={item.itemId}
-                  className={item.quantity < 10 ? "low-stock-row" : ""}
-                >
-                  <td>{item.itemId}</td>
-                  <td>{item.itemName}</td>
-                  <td>
-                    {editingItem?.itemId === item.itemId ? (
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={editQuantity}
-                        onChange={(e) => setEditQuantity(e.target.value)}
-                        className="quantity-input"
-                      />
+              displayedItems.map((item) => {
+                if (!item || !item.itemId) {
+                  console.warn("Invalid item in inventory:", item);
+                  return null;
+                }
+                // Safely convert quantity to number
+                const quantity = typeof item.quantity === 'number' 
+                  ? item.quantity 
+                  : parseFloat(item.quantity) || 0;
+                
+                return (
+                  <tr
+                    key={item.itemId}
+                    className={quantity < 10 ? "low-stock-row" : ""}
+                  >
+                    <td>{item.itemId}</td>
+                    <td>{item.itemName || 'N/A'}</td>
+                    <td>
+                      {editingItem?.itemId === item.itemId ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editQuantity}
+                          onChange={(e) => setEditQuantity(e.target.value)}
+                          className="quantity-input"
+                        />
                     ) : (
-                      item.quantity.toFixed(2)
+                      quantity.toFixed(2)
                     )}
-                  </td>
+                    </td>
                   <td>
-                    {item.quantity < 10 ? (
+                    {quantity < 10 ? (
                       <span className="status-badge warning">Low Stock</span>
                     ) : (
                       <span className="status-badge">In Stock</span>
@@ -170,7 +189,8 @@ function InventoryManagement() {
                     )}
                   </td>
                 </tr>
-              ))
+                );
+              }).filter(Boolean)
             )}
           </tbody>
         </table>

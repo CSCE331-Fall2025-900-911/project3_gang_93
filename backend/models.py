@@ -1,6 +1,6 @@
 """Pydantic models for request/response validation"""
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List, Any
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Optional, List, Any, Union
 from datetime import date, time
 from decimal import Decimal
 
@@ -88,8 +88,19 @@ class InventoryResponse(BaseModel):
     inventory: List[InventoryItem]
 
 class UpdateInventory(BaseModel):
-    quantity: Decimal
+    quantity: Union[Decimal, float, int, str]
     reason: Optional[str] = None
+    
+    @field_validator('quantity', mode='before')
+    @classmethod
+    def validate_quantity(cls, v):
+        """Convert quantity to Decimal, accepting number or string"""
+        if v is None:
+            raise ValueError("quantity is required")
+        try:
+            return Decimal(str(v))
+        except (ValueError, TypeError):
+            raise ValueError(f"Invalid quantity value: {v}")
 
 # Sales Models
 class SaleItem(BaseModel):

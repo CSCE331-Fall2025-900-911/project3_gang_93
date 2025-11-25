@@ -2,6 +2,23 @@ import { useState } from "react";
 import { reportsAPI } from "../services/api";
 import "./Reports.css";
 
+// Helper function to safely convert Decimal/string to number
+const toNumber = (value) => {
+  if (value == null) return 0;
+  if (typeof value === 'number') return value;
+  const parsed = parseFloat(value);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
+// Helper function to get today's date in local timezone (YYYY-MM-DD format)
+const getTodayLocal = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 function Reports() {
   const [reportType, setReportType] = useState("x-report");
   const [xReportData, setXReportData] = useState(null);
@@ -9,9 +26,9 @@ function Reports() {
   const [productUsageData, setProductUsageData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [reportDate, setReportDate] = useState(new Date().toISOString().split("T")[0]);
-  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split("T")[0]);
+  const [reportDate, setReportDate] = useState(getTodayLocal());
+  const [startDate, setStartDate] = useState(getTodayLocal());
+  const [endDate, setEndDate] = useState(getTodayLocal());
 
   const fetchXReport = async () => {
     try {
@@ -64,6 +81,8 @@ function Reports() {
       fetchProductUsage();
     }
   };
+
+  console.log("Reports render:", { reportType, loading, hasXReport: !!xReportData, hasZReport: !!zReportData, hasProductUsage: !!productUsageData }); // Debug log
 
   return (
     <div className="reports-page">
@@ -141,19 +160,19 @@ function Reports() {
               <div className="report-summary">
                 <div className="summary-item">
                   <span className="summary-label">Total Sales:</span>
-                  <span className="summary-value">${xReportData.totalSales?.toFixed(2) || "0.00"}</span>
+                  <span className="summary-value">${toNumber(xReportData.totalSales).toFixed(2)}</span>
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">Total Voids:</span>
-                  <span className="summary-value">${xReportData.totalVoids?.toFixed(2) || "0.00"}</span>
+                  <span className="summary-value">${toNumber(xReportData.totalVoids).toFixed(2)}</span>
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">Cash Payments:</span>
-                  <span className="summary-value">${xReportData.cashPayments?.toFixed(2) || "0.00"}</span>
+                  <span className="summary-value">${toNumber(xReportData.cashPayments).toFixed(2)}</span>
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">Card Payments:</span>
-                  <span className="summary-value">${xReportData.cardPayments?.toFixed(2) || "0.00"}</span>
+                  <span className="summary-value">${toNumber(xReportData.cardPayments).toFixed(2)}</span>
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">Total Transactions:</span>
@@ -161,7 +180,7 @@ function Reports() {
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">Avg Transaction:</span>
-                  <span className="summary-value">${xReportData.avgTransaction?.toFixed(2) || "0.00"}</span>
+                  <span className="summary-value">${toNumber(xReportData.avgTransaction).toFixed(2)}</span>
                 </div>
               </div>
 
@@ -183,10 +202,10 @@ function Reports() {
                       {xReportData.hourlyData.map((hour, index) => (
                         <tr key={index}>
                           <td>{hour.hour}:00</td>
-                          <td>${hour.sales?.toFixed(2) || "0.00"}</td>
-                          <td>${hour.voids?.toFixed(2) || "0.00"}</td>
-                          <td>${hour.cash?.toFixed(2) || "0.00"}</td>
-                          <td>${hour.card?.toFixed(2) || "0.00"}</td>
+                          <td>${toNumber(hour.sales).toFixed(2)}</td>
+                          <td>${toNumber(hour.voids).toFixed(2)}</td>
+                          <td>${toNumber(hour.cash).toFixed(2)}</td>
+                          <td>${toNumber(hour.card).toFixed(2)}</td>
                           <td>{hour.transactions || 0}</td>
                         </tr>
                       ))}
@@ -207,19 +226,19 @@ function Reports() {
               <div className="report-summary">
                 <div className="summary-item">
                   <span className="summary-label">Total Sales:</span>
-                  <span className="summary-value">${zReportData.totalSales?.toFixed(2) || "0.00"}</span>
+                  <span className="summary-value">${toNumber(zReportData.totalSales).toFixed(2)}</span>
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">Total Tax:</span>
-                  <span className="summary-value">${zReportData.totalTax?.toFixed(2) || "0.00"}</span>
+                  <span className="summary-value">${toNumber(zReportData.totalTax).toFixed(2)}</span>
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">Cash Payments:</span>
-                  <span className="summary-value">${zReportData.cashPayments?.toFixed(2) || "0.00"}</span>
+                  <span className="summary-value">${toNumber(zReportData.cashPayments).toFixed(2)}</span>
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">Card Payments:</span>
-                  <span className="summary-value">${zReportData.cardPayments?.toFixed(2) || "0.00"}</span>
+                  <span className="summary-value">${toNumber(zReportData.cardPayments).toFixed(2)}</span>
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">Total Transactions:</span>
@@ -227,7 +246,7 @@ function Reports() {
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">Avg Transaction:</span>
-                  <span className="summary-value">${zReportData.avgTransaction?.toFixed(2) || "0.00"}</span>
+                  <span className="summary-value">${toNumber(zReportData.avgTransaction).toFixed(2)}</span>
                 </div>
               </div>
 
@@ -276,7 +295,7 @@ function Reports() {
                         <tr key={product.itemId}>
                           <td>{product.itemId}</td>
                           <td>{product.itemName}</td>
-                          <td>{product.quantityUsed?.toFixed(2) || "0.00"}</td>
+                          <td>{toNumber(product.quantityUsed).toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
