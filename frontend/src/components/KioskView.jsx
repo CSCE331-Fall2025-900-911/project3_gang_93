@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "./KioskView.css";
 
-function KioskView({ menuItems, cart, onAddToCart, onRemoveItem, onCompleteTransaction, onSwitchToCashier }) {
+function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, onSwitchToCashier }) {
   const [filter, setFilter] = useState("all");
   const [currentStep, setCurrentStep] = useState("menu"); // "menu" or "cart"
 
@@ -19,11 +19,6 @@ function KioskView({ menuItems, cart, onAddToCart, onRemoveItem, onCompleteTrans
         if (filter === "tea") return name.includes("tea");
         return true;
       });
-
-  const handleAddToCart = (item) => {
-    onAddToCart(item);
-    // Stay on menu view - user can click cart badge when ready
-  };
 
   if (currentStep === "cart" && cartItems.length > 0) {
     return (
@@ -154,12 +149,12 @@ function KioskView({ menuItems, cart, onAddToCart, onRemoveItem, onCompleteTrans
           <div
             key={item.id}
             className="kiosk-menu-item"
-            onClick={() => handleAddToCart(item)}
+            onClick={() => onItemClick(item)}
           >
             <div className="kiosk-menu-item-icon">{item.icon}</div>
             <div className="kiosk-menu-item-name">{item.name}</div>
             <div className="kiosk-menu-item-price">${item.price.toFixed(2)}</div>
-            <div className="kiosk-menu-item-add">+ Add</div>
+            <div className="kiosk-menu-item-add">+ Customize</div>
           </div>
         ))}
       </div>

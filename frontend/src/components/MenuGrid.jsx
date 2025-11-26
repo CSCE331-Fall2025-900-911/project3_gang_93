@@ -3,7 +3,7 @@ import MenuItem from './MenuItem'
 import { filterMenuItems } from '../utils/menuCategories'
 import './MenuGrid.css'
 
-function MenuGrid({ items, onAddToCart }) {
+function MenuGrid({ items, onItemClick }) {
   const [filter, setFilter] = useState('all')
   
   const filteredItems = filterMenuItems(items, filter)
@@ -36,7 +36,7 @@ function MenuGrid({ items, onAddToCart }) {
       <div className="menu-grid">
         {filteredItems.length > 0 ? (
           filteredItems.map(item => (
-            <MenuItem key={item.id} item={item} onAddToCart={onAddToCart} />
+            <MenuItem key={item.id} item={item} onItemClick={onItemClick} />
           ))
         ) : (
           <div className="no-items-message">
