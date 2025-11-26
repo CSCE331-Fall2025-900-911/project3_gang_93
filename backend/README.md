@@ -38,6 +38,7 @@ CORS_ORIGINS="myWebApp1.com,myWebApp2.com"
 GOOGLE_CLIENT_ID=your_google_client_id        
 GOOGLE_CLIENT_SECRET=your_clients_secret     
 GOOGLE_REDIRECT_URI=you_webAppRedirect  
+ALLOWED_GOOGLE_EMAILS=example@gmail.com,manager@company.com
 ```
 
 **Important**: Make sure to set `DB_PASSWORD` with your actual password - the application requires it to connect to the database.
