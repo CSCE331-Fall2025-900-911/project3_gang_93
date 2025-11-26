@@ -13,10 +13,12 @@ app = FastAPI(title="POS System API", version="1.0.0")
 
 # CORS middleware for frontend
 # Get allowed origins from environment variable or use defaults
-allowed_origins = os.getenv(
+cors_origins_str = os.getenv(
     "CORS_ORIGINS",
     "http://localhost:5173,http://localhost:3000,https://project3-gang-93.onrender.com"
-).split(",")
+)
+# Remove quotes and whitespace, then split
+allowed_origins = [origin.strip().strip('"').strip("'") for origin in cors_origins_str.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,

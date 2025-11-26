@@ -1,6 +1,6 @@
 """Pydantic models for request/response validation"""
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List, Any, Union
+from typing import Optional, List, Any, Union, Literal
 from datetime import date, time
 from decimal import Decimal
 
@@ -30,12 +30,8 @@ class TransactionItem(BaseModel):
     addOnIDs: Optional[List[int]] = None
     quantity: int
     # Optional customization fields
-    ice: Optional[str] = None  # e.g., "extra", "light", "normal", "no ice"
-    sweetness: Optional[str] = None  # e.g., "0%", "25%", "50%", "75%", "100%"
-    addOnIDs: Optional[List[int]] = None  # List of add-on item IDs
-
-    ice: Literal["light", "normal", "extra"]
-    sweetness: Literal["0%", "25%", "50%", "75%", "100%"]
+    ice: Optional[Literal["light", "normal", "extra"]] = None
+    sweetness: Optional[Literal["0%", "25%", "50%", "75%", "100%"]] = None
 
 class TransactionCreate(BaseModel):
     customerId: Optional[int] = None
