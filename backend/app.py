@@ -1,8 +1,12 @@
 """FastAPI application for POS System"""
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
+from google.auth.transport import requests as gauth_requests
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from typing import Optional
-from datetime import date, time, datetime
+from datetime import datetime
+from google.oauth2 import id_token
+import requests
 import json
 import os
 
@@ -1073,6 +1077,72 @@ def get_employee(employee_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    
+@app.get("/api/auth/google/login")
+def google_login():
+    """Redirect user to Google OAuth consent screen"""
+
+    base_url = (
+        "https://accounts.google.com/o/oauth2/v2/auth"
+        "?response_type=code"
+        "&client_id={client_id}"
+        "&redirect_uri={redirect_uri}"
+        "&scope=openid%20email%20profile"
+        "&access_type=offline"
+        "&prompt=consent"
+    )
+
+    url = base_url.format(
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        redirect_uri=os.getenv("GOOGLE_REDIRECT_URI")
+    )
+
+    return RedirectResponse(url)
+
+@app.get("/api/auth/google/callback")
+def google_callback(code: str):
+    """Handle callback from Google, validate user, and return manager login"""
+
+    token_url = "https://oauth2.googleapis.com/token"
+
+    data = {
+        "code": code,
+        "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+        "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+        "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI"),
+        "grant_type": "authorization_code"
+    }
+
+    # Exchange authorization code for tokens
+    token_response = requests.post(token_url, data=data).json()
+
+    if "id_token" not in token_response:
+        raise HTTPException(status_code=400, detail="OAuth authentication failed")
+
+    # Decode and verify Google token
+    idinfo = id_token.verify_oauth2_token(
+        token_response["id_token"],
+        gauth_requests.Request(),
+        os.getenv("GOOGLE_CLIENT_ID")
+    )
+
+    user_email = idinfo["email"].lower()
+
+    # Allowed manager emails from .env
+    allowed_emails = os.getenv("ALLOWED_GOOGLE_USERS", "")
+    allowed_list = [email.strip().lower() for email in allowed_emails.split(",")]
+
+    if user_email not in allowed_list:
+        raise HTTPException(status_code=403, detail="This Google account is not allowed.")
+
+    # Return manager login object
+    return {
+        "message": "Google login successful",
+        "email": user_email,
+        "name": idinfo.get("name"),
+        "authLevel": "manager",
+        "loggedInVia": "google-oauth"
+    }
 
 # ================== MANAGEMENT APIs ==================
 
