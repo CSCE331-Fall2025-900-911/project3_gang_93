@@ -8,6 +8,7 @@ import AlertModal from "./components/AlertModal";
 import KioskView from "./components/KioskView";
 import ManagerView from "./components/ManagerView";
 import DrinkCustomizationModal from "./components/DrinkCustomizationModal";
+import KioskLoginPage from "./components/KioskLoginPage";
 import "./App.css";
 
 function App() {
@@ -21,6 +22,20 @@ function App() {
   const [showManager, setShowManager] = useState(false);
   const [customizationModalOpen, setCustomizationModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [kioskUser, setKioskUser] = useState(null);
+
+  // Check for existing kiosk user session on mount
+  useEffect(() => {
+    const storedUser = localStorage.getItem("kiosk_user");
+    if (storedUser) {
+      try {
+        const userInfo = JSON.parse(storedUser);
+        setKioskUser(userInfo);
+      } catch (e) {
+        localStorage.removeItem("kiosk_user");
+      }
+    }
+  }, []);
 
   // Fetch menu items from backend on component mount
   useEffect(() => {
@@ -44,6 +59,16 @@ function App() {
 
     fetchMenu();
   }, []);
+
+  const handleKioskLoginSuccess = (userInfo) => {
+    setKioskUser(userInfo);
+  };
+
+  const handleKioskLogout = () => {
+    localStorage.removeItem("kiosk_user");
+    setKioskUser(null);
+    setCart({});
+  };
 
   const handleItemClick = (item) => {
     setSelectedItem(item);
@@ -228,8 +253,16 @@ function App() {
     );
   }
 
-  // Kiosk View
+  // Kiosk View - Show login page if not authenticated
   if (viewMode === "kiosk") {
+    if (!kioskUser) {
+      return (
+        <div className="app">
+          <KioskLoginPage onLoginSuccess={handleKioskLoginSuccess} />
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <KioskView
@@ -240,6 +273,8 @@ function App() {
           onRemoveItem={removeFromCart}
           onCompleteTransaction={completeTransaction}
           onSwitchToCashier={toggleViewMode}
+          user={kioskUser}
+          onLogout={handleKioskLogout}
         />
         <DrinkCustomizationModal
           item={selectedItem}
