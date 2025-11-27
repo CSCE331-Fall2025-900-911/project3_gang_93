@@ -24,15 +24,32 @@ function App() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [kioskUser, setKioskUser] = useState(null);
 
-  // Check for existing kiosk user session on mount
+  // Check for existing kiosk user session and OAuth callback on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem("kiosk_user");
-    if (storedUser) {
-      try {
-        const userInfo = JSON.parse(storedUser);
-        setKioskUser(userInfo);
-      } catch (e) {
-        localStorage.removeItem("kiosk_user");
+    const urlParams = new URLSearchParams(window.location.search);
+    const email = urlParams.get("email");
+    const error = urlParams.get("error");
+
+    // Handle OAuth callback
+    if (email) {
+      // OAuth callback - switch to kiosk mode and let login page handle it
+      setViewMode("kiosk");
+      // Clean up URL immediately
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (error) {
+      // OAuth error - switch to kiosk mode to show error
+      setViewMode("kiosk");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      // Check if user is already logged in from previous session
+      const storedUser = localStorage.getItem("kiosk_user");
+      if (storedUser) {
+        try {
+          const userInfo = JSON.parse(storedUser);
+          setKioskUser(userInfo);
+        } catch (e) {
+          localStorage.removeItem("kiosk_user");
+        }
       }
     }
   }, []);
