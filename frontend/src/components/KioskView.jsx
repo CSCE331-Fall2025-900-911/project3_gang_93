@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "./KioskView.css";
 
-function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, onSwitchToCashier }) {
+function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, onSwitchToCashier, user, onLoginClick, onLogout }) {
   const [filter, setFilter] = useState("all");
   const [currentStep, setCurrentStep] = useState("menu"); // "menu" or "cart"
 
@@ -105,6 +105,11 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
       <div className="kiosk-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
           <h1 className="kiosk-title">Order Here</h1>
+          {user && (
+            <div className="kiosk-user-info">
+              <span className="kiosk-user-name">{user.name || user.email}</span>
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {cartItems.length > 0 && (
@@ -113,6 +118,24 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
               onClick={() => setCurrentStep("cart")}
             >
               🛒 {totalItems} item{totalItems !== 1 ? 's' : ''} • ${subtotal.toFixed(2)}
+            </button>
+          )}
+          {!user && onLoginClick && (
+            <button
+              className="kiosk-login-button"
+              onClick={onLoginClick}
+              title="Sign in with Google"
+            >
+              Sign In
+            </button>
+          )}
+          {user && onLogout && (
+            <button
+              className="kiosk-logout-button"
+              onClick={onLogout}
+              title="Logout"
+            >
+              Logout
             </button>
           )}
           <button

@@ -62,6 +62,7 @@
   font-weight: 500;
 }
 
+.kiosk-login-button,
 .kiosk-logout-button {
   background: #f0f0f0;
   color: #333;
@@ -74,13 +75,26 @@
   transition: all 0.2s;
 }
 
+.kiosk-login-button:hover,
 .kiosk-logout-button:hover {
   background: #e0e0e0;
   border-color: #ccc;
 }
 
+.kiosk-login-button:active,
 .kiosk-logout-button:active {
   transform: translateY(1px);
+}
+
+.kiosk-login-button {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.kiosk-login-button:hover {
+  background: #5568d3;
+  border-color: #5568d3;
 }
 
 .kiosk-mode-toggle {

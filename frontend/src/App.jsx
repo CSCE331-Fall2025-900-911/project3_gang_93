@@ -8,6 +8,7 @@ import AlertModal from "./components/AlertModal";
 import KioskView from "./components/KioskView";
 import ManagerView from "./components/ManagerView";
 import DrinkCustomizationModal from "./components/DrinkCustomizationModal";
+import KioskLoginPage from "./components/KioskLoginPage";
 import "./App.css";
 
 function App() {
@@ -21,8 +22,33 @@ function App() {
   const [showManager, setShowManager] = useState(false);
   const [customizationModalOpen, setCustomizationModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [kioskUser, setKioskUser] = useState(null);
+  const [showKioskLogin, setShowKioskLogin] = useState(false);
 
-  // No login required for kiosk - removed OAuth handling
+  // Check for existing kiosk user session and OAuth callback on mount
+  useEffect(() => {
+    // Check if user is already logged in from previous session
+    const storedUser = localStorage.getItem("kiosk_user");
+    if (storedUser) {
+      try {
+        const userInfo = JSON.parse(storedUser);
+        setKioskUser(userInfo);
+      } catch (e) {
+        localStorage.removeItem("kiosk_user");
+      }
+    }
+    
+    // Check for OAuth callback - if present, switch to kiosk mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const email = urlParams.get("email");
+    const error = urlParams.get("error");
+    
+    if (email || error) {
+      // OAuth callback detected - switch to kiosk mode
+      // KioskLoginPage will handle extracting user info from query params
+      setViewMode("kiosk");
+    }
+  }, []);
 
   // Fetch menu items from backend on component mount
   useEffect(() => {
@@ -175,6 +201,20 @@ function App() {
     setViewMode((prev) => (prev === "cashier" ? "kiosk" : "cashier"));
   };
 
+  const handleKioskLoginSuccess = (userInfo) => {
+    console.log("[App] Kiosk login success, user:", userInfo);
+    setKioskUser(userInfo);
+    setShowKioskLogin(false);
+    // Ensure we're in kiosk mode
+    setViewMode("kiosk");
+  };
+
+  const handleKioskLogout = () => {
+    localStorage.removeItem("kiosk_user");
+    setKioskUser(null);
+    setCart({});
+  };
+
   // Show manager view if requested
   if (showManager) {
     return <ManagerView onBack={() => setShowManager(false)} />;
@@ -231,8 +271,20 @@ function App() {
     );
   }
 
-  // Kiosk View - No login required
+  // Kiosk View - Login is optional
   if (viewMode === "kiosk") {
+    // Show login modal if user wants to login
+    if (showKioskLogin) {
+      return (
+        <div className="app">
+          <KioskLoginPage 
+            onLoginSuccess={handleKioskLoginSuccess}
+            onCancel={() => setShowKioskLogin(false)}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <KioskView
@@ -243,6 +295,9 @@ function App() {
           onRemoveItem={removeFromCart}
           onCompleteTransaction={completeTransaction}
           onSwitchToCashier={toggleViewMode}
+          user={kioskUser}
+          onLoginClick={() => setShowKioskLogin(true)}
+          onLogout={handleKioskLogout}
         />
         <DrinkCustomizationModal
           item={selectedItem}

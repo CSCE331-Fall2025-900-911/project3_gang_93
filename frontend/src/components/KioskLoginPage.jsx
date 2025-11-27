@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { API_BASE_URL } from "../config/api";
 import "./KioskLoginPage.css";
 
-function KioskLoginPage({ onLoginSuccess }) {
+function KioskLoginPage({ onLoginSuccess, onCancel }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -126,6 +126,14 @@ function KioskLoginPage({ onLoginSuccess }) {
             <p className="kiosk-login-info">
               By signing in, you agree to use this self-service kiosk system.
             </p>
+            {onCancel && (
+              <button
+                className="kiosk-login-cancel"
+                onClick={onCancel}
+              >
+                Continue without signing in
+              </button>
+            )}
           </div>
         </div>
       </div>
