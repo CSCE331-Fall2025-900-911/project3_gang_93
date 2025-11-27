@@ -8,7 +8,6 @@ import AlertModal from "./components/AlertModal";
 import KioskView from "./components/KioskView";
 import ManagerView from "./components/ManagerView";
 import DrinkCustomizationModal from "./components/DrinkCustomizationModal";
-import KioskLoginPage from "./components/KioskLoginPage";
 import "./App.css";
 
 function App() {
@@ -22,33 +21,8 @@ function App() {
   const [showManager, setShowManager] = useState(false);
   const [customizationModalOpen, setCustomizationModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [kioskUser, setKioskUser] = useState(null);
 
-  // Check for existing kiosk user session on mount
-  useEffect(() => {
-    // Check if user is already logged in from previous session
-    const storedUser = localStorage.getItem("kiosk_user");
-    if (storedUser) {
-      try {
-        const userInfo = JSON.parse(storedUser);
-        setKioskUser(userInfo);
-      } catch (e) {
-        localStorage.removeItem("kiosk_user");
-      }
-    }
-    
-    // Check for OAuth callback - if present, switch to kiosk mode
-    // (KioskLoginPage will handle extracting user info from query params)
-    const urlParams = new URLSearchParams(window.location.search);
-    const email = urlParams.get("email");
-    const error = urlParams.get("error");
-    
-    if (email || error) {
-      // OAuth callback detected - switch to kiosk mode
-      // Don't clean up URL here - let KioskLoginPage handle it
-      setViewMode("kiosk");
-    }
-  }, []);
+  // No login required for kiosk - removed OAuth handling
 
   // Fetch menu items from backend on component mount
   useEffect(() => {
@@ -73,18 +47,6 @@ function App() {
     fetchMenu();
   }, []);
 
-  const handleKioskLoginSuccess = (userInfo) => {
-    console.log("[App] Kiosk login success, user:", userInfo);
-    setKioskUser(userInfo);
-    // Ensure we're in kiosk mode
-    setViewMode("kiosk");
-  };
-
-  const handleKioskLogout = () => {
-    localStorage.removeItem("kiosk_user");
-    setKioskUser(null);
-    setCart({});
-  };
 
   const handleItemClick = (item) => {
     setSelectedItem(item);
@@ -269,16 +231,8 @@ function App() {
     );
   }
 
-  // Kiosk View - Show login page if not authenticated
+  // Kiosk View - No login required
   if (viewMode === "kiosk") {
-    if (!kioskUser) {
-      return (
-        <div className="app">
-          <KioskLoginPage onLoginSuccess={handleKioskLoginSuccess} />
-        </div>
-      );
-    }
-
     return (
       <div className="app">
         <KioskView
@@ -289,8 +243,6 @@ function App() {
           onRemoveItem={removeFromCart}
           onCompleteTransaction={completeTransaction}
           onSwitchToCashier={toggleViewMode}
-          user={kioskUser}
-          onLogout={handleKioskLogout}
         />
         <DrinkCustomizationModal
           item={selectedItem}
