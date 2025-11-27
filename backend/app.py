@@ -1082,6 +1082,15 @@ def get_employee(employee_id: int):
 @app.get("/api/auth/google/login")
 def google_login():
     """Redirect user to Google OAuth consent screen"""
+    
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
+    
+    if not client_id or not redirect_uri:
+        raise HTTPException(
+            status_code=500, 
+            detail="OAuth not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_REDIRECT_URI in environment variables."
+        )
 
     base_url = (
         "https://accounts.google.com/o/oauth2/v2/auth"
@@ -1094,9 +1103,13 @@ def google_login():
     )
 
     url = base_url.format(
-        client_id=os.getenv("GOOGLE_CLIENT_ID"),
-        redirect_uri=os.getenv("GOOGLE_REDIRECT_URI")
+        client_id=client_id,
+        redirect_uri=redirect_uri
     )
+    
+    # Log for debugging (remove in production if sensitive)
+    print(f"[OAuth] Redirecting to Google with client_id: {client_id[:20]}...")
+    print(f"[OAuth] Redirect URI: {redirect_uri}")
 
     return RedirectResponse(url)
 
