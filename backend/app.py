@@ -9,6 +9,7 @@ from google.oauth2 import id_token
 import requests
 import json
 import os
+import urllib.parse
 
 from models import *
 from database import execute_query, execute_insert, get_db_cursor
@@ -1101,7 +1102,7 @@ def google_login():
 
 @app.get("/api/auth/google/callback")
 def google_callback(code: str):
-    """Handle callback from Google, validate user, and return manager login"""
+    """Handle callback from Google, validate user, and redirect to frontend"""
 
     token_url = "https://oauth2.googleapis.com/token"
 
@@ -1117,7 +1118,9 @@ def google_callback(code: str):
     token_response = requests.post(token_url, data=data).json()
 
     if "id_token" not in token_response:
-        raise HTTPException(status_code=400, detail="OAuth authentication failed")
+        # Redirect to frontend with error
+        frontend_url = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")[0].strip().strip('"').strip("'")
+        return RedirectResponse(url=f"{frontend_url}?error=oauth_failed")
 
     # Decode and verify Google token
     idinfo = id_token.verify_oauth2_token(
@@ -1127,18 +1130,32 @@ def google_callback(code: str):
     )
 
     user_email = idinfo["email"].lower()
-
-    # Return customer login object
-    return {
-        "customerId": int,
-        "firstName": idinfo.get("name").split(" ")[0] if idinfo.get("name") else None,
-        "lastName": idinfo.get("name").split(" ")[1] if idinfo.get("name") and len(idinfo.get("name").split(" ")) > 1 else None,
-        "DOB": None,
-        "phoneNumber": None,
+    user_name = idinfo.get("name", "")
+    
+    # Get frontend URL from CORS_ORIGINS (first one)
+    frontend_url = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")[0].strip().strip('"').strip("'")
+    
+    # Prepare user info for redirect
+    user_info = {
         "email": user_email,
-        "points": 0,
-        "dateJoined": None
+        "name": user_name,
+        "firstName": user_name.split(" ")[0] if user_name else None,
+        "lastName": user_name.split(" ")[1] if user_name and len(user_name.split(" ")) > 1 else None,
+        "picture": idinfo.get("picture"),
+        "sub": idinfo.get("sub")
     }
+    
+    # Encode user info as query parameters
+    params = urllib.parse.urlencode({
+        "email": user_info["email"],
+        "name": user_info["name"] or "",
+        "picture": user_info["picture"] or "",
+        "sub": user_info["sub"] or ""
+    })
+    
+    # Redirect to frontend root with user info (frontend will handle kiosk mode)
+    redirect_url = f"{frontend_url}?{params}"
+    return RedirectResponse(url=redirect_url)
 
 # ================== MANAGEMENT APIs ==================
 

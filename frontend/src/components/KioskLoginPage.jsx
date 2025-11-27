@@ -6,16 +6,47 @@ function KioskLoginPage({ onLoginSuccess }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Check if user is already authenticated
+  // Check if user is already authenticated or handling OAuth callback
   useEffect(() => {
-    // Check if user is already logged in from previous session
-    const storedUser = localStorage.getItem("kiosk_user");
-    if (storedUser) {
-      try {
-        const userInfo = JSON.parse(storedUser);
-        onLoginSuccess(userInfo);
-      } catch (e) {
-        localStorage.removeItem("kiosk_user");
+    const urlParams = new URLSearchParams(window.location.search);
+    const email = urlParams.get("email");
+    const name = urlParams.get("name");
+    const sub = urlParams.get("sub");
+    const error = urlParams.get("error");
+
+    if (error) {
+      setError("Authentication failed. Please try again.");
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (email && sub) {
+      // User successfully authenticated via OAuth callback
+      const userInfo = {
+        email: decodeURIComponent(email),
+        name: decodeURIComponent(name || ""),
+        picture: urlParams.get("picture") ? decodeURIComponent(urlParams.get("picture")) : "",
+        sub: decodeURIComponent(sub),
+        firstName: decodeURIComponent(name || "").split(" ")[0] || null,
+        lastName: decodeURIComponent(name || "").split(" ").slice(1).join(" ") || null,
+      };
+      
+      // Store in localStorage for session persistence
+      localStorage.setItem("kiosk_user", JSON.stringify(userInfo));
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Notify parent component
+      onLoginSuccess(userInfo);
+    } else {
+      // Check if user is already logged in from previous session
+      const storedUser = localStorage.getItem("kiosk_user");
+      if (storedUser) {
+        try {
+          const userInfo = JSON.parse(storedUser);
+          onLoginSuccess(userInfo);
+        } catch (e) {
+          localStorage.removeItem("kiosk_user");
+        }
       }
     }
   }, [onLoginSuccess]);
