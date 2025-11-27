@@ -7,6 +7,8 @@ import PaymentSelector from "./components/PaymentSelector";
 import AlertModal from "./components/AlertModal";
 import KioskView from "./components/KioskView";
 import ManagerView from "./components/ManagerView";
+import DrinkCustomizationModal from "./components/DrinkCustomizationModal";
+import KioskLoginPage from "./components/KioskLoginPage";
 import "./App.css";
 
 function App() {
@@ -18,6 +20,22 @@ function App() {
   const [alertMessage, setAlertMessage] = useState(null);
   const [viewMode, setViewMode] = useState("cashier"); // "cashier" or "kiosk"
   const [showManager, setShowManager] = useState(false);
+  const [customizationModalOpen, setCustomizationModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [kioskUser, setKioskUser] = useState(null);
+
+  // Check for existing kiosk user session on mount
+  useEffect(() => {
+    const storedUser = localStorage.getItem("kiosk_user");
+    if (storedUser) {
+      try {
+        const userInfo = JSON.parse(storedUser);
+        setKioskUser(userInfo);
+      } catch (e) {
+        localStorage.removeItem("kiosk_user");
+      }
+    }
+  }, []);
 
   // Fetch menu items from backend on component mount
   useEffect(() => {
@@ -42,13 +60,36 @@ function App() {
     fetchMenu();
   }, []);
 
-  const addToCart = (item) => {
+  const handleKioskLoginSuccess = (userInfo) => {
+    setKioskUser(userInfo);
+  };
+
+  const handleKioskLogout = () => {
+    localStorage.removeItem("kiosk_user");
+    setKioskUser(null);
+    setCart({});
+  };
+
+  const handleItemClick = (item) => {
+    setSelectedItem(item);
+    setCustomizationModalOpen(true);
+  };
+
+  const addToCart = (customizedItem) => {
+    // Create a unique key based on item ID and customizations
+    const customizationKey = JSON.stringify({
+      addOnIDs: (customizedItem.addOnIDs || []).sort(),
+      ice: customizedItem.ice || "normal",
+      sweetness: customizedItem.sweetness || "100%",
+    });
+    const cartKey = `${customizedItem.id}_${customizationKey}`;
+
     setCart((prevCart) => {
-      const existingItem = prevCart[item.id];
+      const existingItem = prevCart[cartKey];
       if (existingItem) {
         return {
           ...prevCart,
-          [item.id]: {
+          [cartKey]: {
             ...existingItem,
             quantity: existingItem.quantity + 1,
           },
@@ -56,8 +97,8 @@ function App() {
       } else {
         return {
           ...prevCart,
-          [item.id]: {
-            ...item,
+          [cartKey]: {
+            ...customizedItem,
             quantity: 1,
           },
         };
@@ -212,17 +253,37 @@ function App() {
     );
   }
 
-  // Kiosk View
+  // Kiosk View - Show login page if not authenticated
   if (viewMode === "kiosk") {
+    if (!kioskUser) {
+      return (
+        <div className="app">
+          <KioskLoginPage onLoginSuccess={handleKioskLoginSuccess} />
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <KioskView
           menuItems={menuItems}
           cart={cart}
+          onItemClick={handleItemClick}
           onAddToCart={addToCart}
           onRemoveItem={removeFromCart}
           onCompleteTransaction={completeTransaction}
           onSwitchToCashier={toggleViewMode}
+          user={kioskUser}
+          onLogout={handleKioskLogout}
+        />
+        <DrinkCustomizationModal
+          item={selectedItem}
+          isOpen={customizationModalOpen}
+          onClose={() => {
+            setCustomizationModalOpen(false);
+            setSelectedItem(null);
+          }}
+          onAddToCart={addToCart}
         />
         <PaymentSelector
           open={popupOpen}
@@ -251,13 +312,22 @@ function App() {
         onManagerClick={() => setShowManager(true)}
       />
       <main className="main-content">
-        <MenuGrid items={menuItems} onAddToCart={addToCart} />
+        <MenuGrid items={menuItems} onItemClick={handleItemClick} />
         <OrderPanel
           cart={cart}
           onRemoveItem={removeFromCart}
           onCompleteTransaction={completeTransaction}
         />
       </main>
+      <DrinkCustomizationModal
+        item={selectedItem}
+        isOpen={customizationModalOpen}
+        onClose={() => {
+          setCustomizationModalOpen(false);
+          setSelectedItem(null);
+        }}
+        onAddToCart={addToCart}
+      />
       <PaymentSelector
         open={popupOpen}
         onClose={() => setPopupOpen(false)}

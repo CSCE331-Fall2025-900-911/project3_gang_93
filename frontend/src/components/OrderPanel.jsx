@@ -23,10 +23,11 @@ function OrderPanel({ cart, onRemoveItem, onCompleteTransaction }) {
             <div className="empty-cart">No items in cart</div>
           ) : (
             <div className="cart-items">
-              {cartItems.map(item => (
+              {Object.entries(cart).map(([cartKey, item]) => (
                 <CartItem 
-                  key={item.id} 
+                  key={cartKey} 
                   item={item} 
+                  cartKey={cartKey}
                   onRemove={onRemoveItem}
                 />
               ))}

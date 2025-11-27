@@ -82,6 +82,23 @@ export const menuAPI = {
 };
 
 /**
+ * Add-Ons API
+ */
+export const addOnsAPI = {
+  // Get all add-ons
+  getAll: async () => {
+    const data = await apiRequest("/api/addons");
+    return data.addOns.map((addon) => ({
+      id: addon.addOnID,
+      addOnID: addon.addOnID,
+      name: addon.addOnName,
+      price: parseFloat(addon.price),
+      ingredients: addon.ingredients,
+    }));
+  },
+};
+
+/**
  * Transaction API
  */
 export const transactionAPI = {

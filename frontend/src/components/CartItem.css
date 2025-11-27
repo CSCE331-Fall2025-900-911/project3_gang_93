@@ -26,6 +26,22 @@
   color: #666;
 }
 
+.cart-item-customizations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.customization-tag {
+  font-size: 0.75rem;
+  color: #667eea;
+  background-color: #f0f4ff;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
 .cart-item-right {
   display: flex;
   align-items: center;
