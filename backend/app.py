@@ -1130,6 +1130,7 @@ def google_callback(code: str):
 
     # Return customer login object
     return {
+        "msg": "Google OAuth login successful",
         "customerId": int,
         "firstName": idinfo.get("name").split(" ")[0] if idinfo.get("name") else None,
         "lastName": idinfo.get("name").split(" ")[1] if idinfo.get("name") and len(idinfo.get("name").split(" ")) > 1 else None,
