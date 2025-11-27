@@ -1130,11 +1130,14 @@ def google_callback(code: str):
 
     # Return customer login object
     return {
-        "message": "Google login successful",
+        "customerId": int,
+        "firstName": idinfo.get("name").split(" ")[0] if idinfo.get("name") else None,
+        "lastName": idinfo.get("name").split(" ")[1] if idinfo.get("name") and len(idinfo.get("name").split(" ")) > 1 else None,
+        "DOB": None,
+        "phoneNumber": None,
         "email": user_email,
-        "name": idinfo.get("name"),
-        "authLevel": "manager",
-        "loggedInVia": "google-oauth"
+        "points": 0,
+        "dateJoined": None
     }
 
 # ================== MANAGEMENT APIs ==================
