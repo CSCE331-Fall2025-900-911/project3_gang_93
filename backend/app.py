@@ -6,10 +6,10 @@ from fastapi.responses import RedirectResponse
 from typing import Optional
 from datetime import datetime
 from google.oauth2 import id_token
+import urllib.parse
 import requests
 import json
 import os
-import urllib.parse
 
 from models import *
 from database import execute_query, execute_insert, get_db_cursor
@@ -1078,99 +1078,80 @@ def get_employee(employee_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-    
+
 @app.get("/api/auth/google/login")
 def google_login():
-    """Redirect user to Google OAuth consent screen"""
-    
+    """Redirect user to Google OAuth consent screen."""
+
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
-    
+
     if not client_id or not redirect_uri:
         raise HTTPException(
             status_code=500, 
-            detail="OAuth not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_REDIRECT_URI in environment variables."
+            detail="OAuth not configured (GOOGLE_CLIENT_ID or GOOGLE_REDIRECT_URI missing)"
         )
 
-    base_url = (
+    url = (
         "https://accounts.google.com/o/oauth2/v2/auth"
         "?response_type=code"
-        "&client_id={client_id}"
-        "&redirect_uri={redirect_uri}"
+        f"&client_id={urllib.parse.quote(client_id)}"
+        f"&redirect_uri={urllib.parse.quote(redirect_uri)}"
         "&scope=openid%20email%20profile"
         "&access_type=offline"
         "&prompt=consent"
     )
 
-    url = base_url.format(
-        client_id=client_id,
-        redirect_uri=redirect_uri
-    )
-    
-    # Log for debugging (remove in production if sensitive)
-    print(f"[OAuth] Redirecting to Google with client_id: {client_id[:20]}...")
-    print(f"[OAuth] Redirect URI: {redirect_uri}")
-
     return RedirectResponse(url)
+
 
 @app.get("/api/auth/google/callback")
 def google_callback(code: str):
-    """Handle callback from Google, validate user, and redirect to frontend"""
+    """Handle callback from Google, verify token, and redirect to frontend with user info."""
 
-    token_url = "https://oauth2.googleapis.com/token"
-
-    data = {
-        "code": code,
-        "client_id": os.getenv("GOOGLE_CLIENT_ID"),
-        "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
-        "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI"),
-        "grant_type": "authorization_code"
-    }
-
-    # Exchange authorization code for tokens
-    token_response = requests.post(token_url, data=data).json()
+    # Exchange code for tokens
+    token_response = requests.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "code": code,
+            "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+            "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+            "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI"),
+            "grant_type": "authorization_code"
+        }
+    ).json()
 
     if "id_token" not in token_response:
-        # Redirect to frontend with error
-        frontend_url = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")[0].strip().strip('"').strip("'")
-        return RedirectResponse(url=f"{frontend_url}?error=oauth_failed")
+        frontend = os.getenv("CORS_ORIGINS", "https://localhost:5173").split(",")[0]
+        return RedirectResponse(f"{frontend}?oauth=failed")
 
-    # Decode and verify Google token
+    # Decode Google ID token
     idinfo = id_token.verify_oauth2_token(
         token_response["id_token"],
         gauth_requests.Request(),
         os.getenv("GOOGLE_CLIENT_ID")
     )
 
-    user_email = idinfo["email"].lower()
+    email = idinfo.get("email", "").lower()
+    name = idinfo.get("name", "")
+    picture = idinfo.get("picture", "")
+    sub = idinfo.get("sub", "")
 
-    # Return customer login object
-    return {
-        "msg": "Google OAuth login successful",
-        "customerId": int,
-        "firstName": idinfo.get("name").split(" ")[0] if idinfo.get("name") else None,
-        "lastName": idinfo.get("name").split(" ")[1] if idinfo.get("name") and len(idinfo.get("name").split(" ")) > 1 else None,
-        "DOB": None,
-        "phoneNumber": None,
-        "email": user_email,
-        "name": user_name,
-        "firstName": user_name.split(" ")[0] if user_name else None,
-        "lastName": user_name.split(" ")[1] if user_name and len(user_name.split(" ")) > 1 else None,
-        "picture": idinfo.get("picture"),
-        "sub": idinfo.get("sub")
-    }
-    
-    # Encode user info as query parameters
+    first_name = name.split(" ")[0] if name else ""
+    last_name = name.split(" ")[1] if len(name.split(" ")) > 1 else ""
+
+    # Redirect to frontend WITH user info
+    frontend = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")[0]
+
     params = urllib.parse.urlencode({
-        "email": user_info["email"],
-        "name": user_info["name"] or "",
-        "picture": user_info["picture"] or "",
-        "sub": user_info["sub"] or ""
+        "email": email,
+        "firstName": first_name,
+        "lastName": last_name,
+        "picture": picture,
+        "sub": sub
     })
-    
-    # Redirect to frontend root with user info (frontend will handle kiosk mode)
-    redirect_url = f"{frontend_url}?{params}"
-    return RedirectResponse(url=redirect_url)
+
+    return RedirectResponse(f"{frontend}/oauth-success?{params}")
 
 # ================== MANAGEMENT APIs ==================
 
