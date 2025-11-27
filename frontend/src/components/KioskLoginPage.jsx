@@ -14,20 +14,26 @@ function KioskLoginPage({ onLoginSuccess }) {
     const sub = urlParams.get("sub");
     const error = urlParams.get("error");
 
+    // Debug logging
+    console.log("[KioskLoginPage] OAuth callback params:", { email, name, sub, error });
+    console.log("[KioskLoginPage] Full URL params:", window.location.search);
+
     if (error) {
       setError("Authentication failed. Please try again.");
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (email && sub) {
+    } else if (email) {
       // User successfully authenticated via OAuth callback
       const userInfo = {
         email: decodeURIComponent(email),
         name: decodeURIComponent(name || ""),
         picture: urlParams.get("picture") ? decodeURIComponent(urlParams.get("picture")) : "",
-        sub: decodeURIComponent(sub),
+        sub: sub ? decodeURIComponent(sub) : email, // Use email as fallback for sub
         firstName: decodeURIComponent(name || "").split(" ")[0] || null,
         lastName: decodeURIComponent(name || "").split(" ").slice(1).join(" ") || null,
       };
+      
+      console.log("[KioskLoginPage] User info extracted:", userInfo);
       
       // Store in localStorage for session persistence
       localStorage.setItem("kiosk_user", JSON.stringify(userInfo));
@@ -36,6 +42,7 @@ function KioskLoginPage({ onLoginSuccess }) {
       window.history.replaceState({}, document.title, window.location.pathname);
       
       // Notify parent component
+      console.log("[KioskLoginPage] Calling onLoginSuccess");
       onLoginSuccess(userInfo);
     } else {
       // Check if user is already logged in from previous session

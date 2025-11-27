@@ -24,33 +24,29 @@ function App() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [kioskUser, setKioskUser] = useState(null);
 
-  // Check for existing kiosk user session and OAuth callback on mount
+  // Check for existing kiosk user session on mount
   useEffect(() => {
+    // Check if user is already logged in from previous session
+    const storedUser = localStorage.getItem("kiosk_user");
+    if (storedUser) {
+      try {
+        const userInfo = JSON.parse(storedUser);
+        setKioskUser(userInfo);
+      } catch (e) {
+        localStorage.removeItem("kiosk_user");
+      }
+    }
+    
+    // Check for OAuth callback - if present, switch to kiosk mode
+    // (KioskLoginPage will handle extracting user info from query params)
     const urlParams = new URLSearchParams(window.location.search);
     const email = urlParams.get("email");
     const error = urlParams.get("error");
-
-    // Handle OAuth callback
-    if (email) {
-      // OAuth callback - switch to kiosk mode and let login page handle it
+    
+    if (email || error) {
+      // OAuth callback detected - switch to kiosk mode
+      // Don't clean up URL here - let KioskLoginPage handle it
       setViewMode("kiosk");
-      // Clean up URL immediately
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (error) {
-      // OAuth error - switch to kiosk mode to show error
-      setViewMode("kiosk");
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else {
-      // Check if user is already logged in from previous session
-      const storedUser = localStorage.getItem("kiosk_user");
-      if (storedUser) {
-        try {
-          const userInfo = JSON.parse(storedUser);
-          setKioskUser(userInfo);
-        } catch (e) {
-          localStorage.removeItem("kiosk_user");
-        }
-      }
     }
   }, []);
 
@@ -78,7 +74,10 @@ function App() {
   }, []);
 
   const handleKioskLoginSuccess = (userInfo) => {
+    console.log("[App] Kiosk login success, user:", userInfo);
     setKioskUser(userInfo);
+    // Ensure we're in kiosk mode
+    setViewMode("kiosk");
   };
 
   const handleKioskLogout = () => {
