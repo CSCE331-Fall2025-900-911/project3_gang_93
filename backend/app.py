@@ -1122,8 +1122,9 @@ def google_callback(code: str):
     ).json()
 
     if "id_token" not in token_response:
-        frontend = os.getenv("CORS_ORIGINS", "https://localhost:5173").split(",")[0]
-        return RedirectResponse(f"{frontend}?oauth=failed")
+        cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+        frontend = cors_origins_str.split(",")[0].strip().strip('"').strip("'")
+        return RedirectResponse(f"{frontend}?error=oauth_failed")
 
     # Decode Google ID token
     idinfo = id_token.verify_oauth2_token(
@@ -1141,17 +1142,20 @@ def google_callback(code: str):
     last_name = name.split(" ")[1] if len(name.split(" ")) > 1 else ""
 
     # Redirect to frontend WITH user info
-    frontend = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")[0]
+    cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+    frontend = cors_origins_str.split(",")[0].strip().strip('"').strip("'")
 
     params = urllib.parse.urlencode({
         "email": email,
-        "firstName": first_name,
-        "lastName": last_name,
+        "name": name,  # Use full name instead of firstName/lastName
         "picture": picture,
         "sub": sub
     })
 
-    return RedirectResponse(f"{frontend}/oauth-success?{params}")
+    # Redirect to frontend root with user info (frontend will handle kiosk mode)
+    redirect_url = f"{frontend}?{params}"
+    print(f"[OAuth] Redirecting to frontend: {redirect_url}")
+    return RedirectResponse(url=redirect_url)
 
 # ================== MANAGEMENT APIs ==================
 
