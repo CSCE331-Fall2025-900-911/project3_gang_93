@@ -27,6 +27,19 @@ function App() {
 
   // Check for existing kiosk user session and OAuth callback on mount
   useEffect(() => {
+    // Check for OAuth callback first - if present, show login page to process it
+    const urlParams = new URLSearchParams(window.location.search);
+    const email = urlParams.get("email");
+    const error = urlParams.get("error");
+    
+    if (email || error) {
+      // OAuth callback detected - switch to kiosk mode and show login page
+      // KioskLoginPage will handle extracting user info from query params
+      setViewMode("kiosk");
+      setShowKioskLogin(true);
+      return; // Don't check for stored user if OAuth callback is present
+    }
+    
     // Check if user is already logged in from previous session
     const storedUser = localStorage.getItem("kiosk_user");
     if (storedUser) {
@@ -36,17 +49,6 @@ function App() {
       } catch (e) {
         localStorage.removeItem("kiosk_user");
       }
-    }
-    
-    // Check for OAuth callback - if present, switch to kiosk mode
-    const urlParams = new URLSearchParams(window.location.search);
-    const email = urlParams.get("email");
-    const error = urlParams.get("error");
-    
-    if (email || error) {
-      // OAuth callback detected - switch to kiosk mode
-      // KioskLoginPage will handle extracting user info from query params
-      setViewMode("kiosk");
     }
   }, []);
 
@@ -207,6 +209,10 @@ function App() {
     setShowKioskLogin(false);
     // Ensure we're in kiosk mode
     setViewMode("kiosk");
+    // Clear any OAuth query params from URL
+    if (window.location.search) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   };
 
   const handleKioskLogout = () => {
