@@ -1128,14 +1128,7 @@ def google_callback(code: str):
 
     user_email = idinfo["email"].lower()
 
-    # Allowed manager emails from .env
-    allowed_emails = os.getenv("ALLOWED_GOOGLE_USERS", "")
-    allowed_list = [email.strip().lower() for email in allowed_emails.split(",")]
-
-    if user_email not in allowed_list:
-        raise HTTPException(status_code=403, detail="This Google account is not allowed.")
-
-    # Return manager login object
+    # Return customer login object
     return {
         "message": "Google login successful",
         "email": user_email,
