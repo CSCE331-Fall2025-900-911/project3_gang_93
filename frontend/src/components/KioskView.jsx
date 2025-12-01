@@ -47,8 +47,8 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
           </div>
 
           <div className="kiosk-cart-items">
-            {cartItems.map(item => (
-              <div key={item.id} className="kiosk-cart-item">
+            {Object.entries(cart).map(([cartKey, item]) => (
+              <div key={cartKey} className="kiosk-cart-item">
                 <div className="kiosk-cart-item-info">
                   <span className="kiosk-cart-item-name">{item.name}</span>
                   <span className="kiosk-cart-item-price">
@@ -58,7 +58,7 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
                 <div className="kiosk-cart-item-controls">
                   <button
                     className="kiosk-quantity-button"
-                    onClick={() => onRemoveItem(item.id)}
+                    onClick={() => onRemoveItem(cartKey)}
                   >
                     −
                   </button>
