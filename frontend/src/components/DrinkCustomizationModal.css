@@ -148,6 +148,14 @@
   color: #333;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: normal;
+  word-wrap: break-word;
+  text-align: center;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
 }
 
 .option-button:hover {
@@ -306,6 +314,51 @@
 
 .add-to-cart-button:active {
   transform: translateY(0);
+}
+
+/* Expanded Modal Styles */
+.customization-modal-expanded .option-button {
+  padding: 1.25rem 1.5rem;
+  font-size: 1.2rem;
+  min-height: 70px;
+  line-height: 1.5;
+}
+
+.customization-modal-expanded .addon-item,
+.customization-modal-expanded .cancel-button,
+.customization-modal-expanded .add-to-cart-button,
+.customization-modal-expanded .customization-modal-close {
+  padding: 1.25rem 2rem;
+  font-size: 1.3rem;
+  min-height: 60px;
+}
+
+.customization-modal-expanded .customization-modal-close {
+  width: 50px;
+  height: 50px;
+  font-size: 2.5rem;
+}
+
+.customization-modal-expanded .addon-checkbox {
+  width: 32px;
+  height: 32px;
+}
+
+.customization-modal-expanded .section-title {
+  font-size: 1.4rem;
+  margin-bottom: 1.5rem;
+}
+
+.customization-modal-expanded .customization-modal-title {
+  font-size: 2rem;
+}
+
+.customization-modal-expanded .drink-name {
+  font-size: 1.6rem;
+}
+
+.customization-modal-expanded .drink-icon {
+  font-size: 4rem;
 }
 
 /* Responsive design */

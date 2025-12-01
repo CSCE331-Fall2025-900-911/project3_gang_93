@@ -24,6 +24,7 @@ function App() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [kioskUser, setKioskUser] = useState(null);
   const [showKioskLogin, setShowKioskLogin] = useState(false);
+  const [isKioskExpanded, setIsKioskExpanded] = useState(false);
 
   // Check for existing kiosk user session and OAuth callback on mount
   useEffect(() => {
@@ -304,6 +305,8 @@ function App() {
           user={kioskUser}
           onLoginClick={() => setShowKioskLogin(true)}
           onLogout={handleKioskLogout}
+          isExpanded={isKioskExpanded}
+          onToggleExpanded={() => setIsKioskExpanded(!isKioskExpanded)}
         />
         <DrinkCustomizationModal
           item={selectedItem}
@@ -313,6 +316,7 @@ function App() {
             setSelectedItem(null);
           }}
           onAddToCart={addToCart}
+          isExpanded={isKioskExpanded}
         />
         <PaymentSelector
           open={popupOpen}
@@ -322,6 +326,7 @@ function App() {
             (sum, item) => sum + item.price * item.quantity,
             0
           )}
+          isExpanded={isKioskExpanded}
         />
         <AlertModal
           message={alertMessage}

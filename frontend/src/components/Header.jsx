@@ -3,8 +3,6 @@ import './Header.css'
 
 function Header({ viewMode, onViewModeChange, onManagerClick }) {
   const navItems = [
-    { icon: '🔍', label: 'Toggle Size' },
-    { icon: '🕐', label: 'Transaction History' },
     { icon: '⚙️', label: 'Manage', onClick: onManagerClick },
     { icon: '📤', label: 'Log Out' },
   ]

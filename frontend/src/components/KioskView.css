@@ -159,6 +159,11 @@
   max-width: 1400px;
 }
 
+.kiosk-menu-grid-expanded {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
 .kiosk-menu-item {
   background: white;
   border: 1px solid #e0e0e0;
@@ -175,6 +180,12 @@
   justify-content: space-between;
 }
 
+.kiosk-menu-item-expanded {
+  padding: 3rem;
+  min-height: 380px;
+  gap: 1rem;
+}
+
 .kiosk-menu-item:hover {
   border-color: #999;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -189,6 +200,11 @@
   margin-bottom: 0.5rem;
 }
 
+.kiosk-menu-item-expanded .kiosk-menu-item-icon {
+  font-size: 5rem;
+  margin-bottom: 0.75rem;
+}
+
 .kiosk-menu-item-name {
   font-size: 1.1rem;
   font-weight: 500;
@@ -196,10 +212,19 @@
   line-height: 1.3;
 }
 
+.kiosk-menu-item-expanded .kiosk-menu-item-name {
+  font-size: 1.4rem;
+  line-height: 1.4;
+}
+
 .kiosk-menu-item-price {
   font-size: 0.95rem;
   font-weight: 500;
   color: #333;
+}
+
+.kiosk-menu-item-expanded .kiosk-menu-item-price {
+  font-size: 1.2rem;
 }
 
 .kiosk-menu-item-add {
@@ -214,6 +239,12 @@
   border: none;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+.kiosk-menu-item-expanded .kiosk-menu-item-add {
+  padding: 1rem 2rem;
+  font-size: 1.2rem;
+  margin-top: 0.75rem;
 }
 
 .kiosk-menu-item-add:hover {
@@ -392,6 +423,38 @@
 
 .kiosk-checkout-button:active {
   transform: translateY(1px);
+}
+
+/* Expanded Button Styles */
+.kiosk-menu-item-expanded .kiosk-menu-item-add {
+  padding: 1rem 2rem;
+  font-size: 1.2rem;
+  margin-top: 0.75rem;
+}
+
+.kiosk-view-expanded .kiosk-mode-toggle,
+.kiosk-view-expanded .kiosk-cart-badge,
+.kiosk-view-expanded .kiosk-login-button,
+.kiosk-view-expanded .kiosk-logout-button,
+.kiosk-view-expanded .kiosk-filter-button,
+.kiosk-view-expanded .kiosk-back-button,
+.kiosk-view-expanded .kiosk-quantity-button,
+.kiosk-view-expanded .kiosk-checkout-button {
+  padding: 1.25rem 2.5rem;
+  font-size: 1.3rem;
+  min-height: 60px;
+}
+
+.kiosk-view-expanded .kiosk-mode-toggle {
+  width: 60px;
+  height: 60px;
+  font-size: 1.5rem;
+}
+
+.kiosk-view-expanded .kiosk-quantity-button {
+  width: 60px;
+  height: 60px;
+  font-size: 1.6rem;
 }
 
 /* Responsive Design */

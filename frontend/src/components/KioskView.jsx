@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "./KioskView.css";
 
-function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, onSwitchToCashier, user, onLoginClick, onLogout }) {
+function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, onSwitchToCashier, user, onLoginClick, onLogout, isExpanded, onToggleExpanded }) {
   const [filter, setFilter] = useState("all");
   const [currentStep, setCurrentStep] = useState("menu"); // "menu" or "cart"
 
@@ -22,7 +22,7 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
 
   if (currentStep === "cart" && cartItems.length > 0) {
     return (
-      <div className="kiosk-view">
+      <div className={`kiosk-view ${isExpanded ? 'kiosk-view-expanded' : ''}`}>
         <div className="kiosk-cart-view">
           <div className="kiosk-cart-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -101,7 +101,7 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
   }
 
   return (
-    <div className="kiosk-view">
+    <div className={`kiosk-view ${isExpanded ? 'kiosk-view-expanded' : ''}`}>
       <div className="kiosk-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
           <h1 className="kiosk-title">Order Here</h1>
@@ -112,6 +112,13 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button
+            className="kiosk-mode-toggle"
+            onClick={onToggleExpanded}
+            title={isExpanded ? "Normal View" : "Expand View"}
+          >
+            🔍
+          </button>
           {cartItems.length > 0 && (
             <button
               className="kiosk-cart-badge"
@@ -169,11 +176,11 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
         </button>
       </div>
 
-      <div className="kiosk-menu-grid">
+      <div className={`kiosk-menu-grid ${isExpanded ? 'kiosk-menu-grid-expanded' : ''}`}>
         {filteredItems.map(item => (
           <div
             key={item.id}
-            className="kiosk-menu-item"
+            className={`kiosk-menu-item ${isExpanded ? 'kiosk-menu-item-expanded' : ''}`}
             onClick={() => onItemClick(item)}
           >
             <div className="kiosk-menu-item-icon">{item.icon}</div>

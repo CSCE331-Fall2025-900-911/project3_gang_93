@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-export default function PaymentSelector({ open, onClose, onSelect, subtotal }) {
+export default function PaymentSelector({ open, onClose, onSelect, subtotal, isExpanded = false }) {
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [cashAmount, setCashAmount] = useState("");
   const [tipAmount, setTipAmount] = useState("");
@@ -71,25 +71,28 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal }) {
       }}
     >
       <div
+        className={isExpanded ? "payment-selector-expanded" : ""}
         style={{
           background: "#fff",
-          padding: "2rem",
+          padding: isExpanded ? "3rem" : "2rem",
           borderRadius: "10px",
           boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
           textAlign: "center",
-          width: "400px",
+          width: isExpanded ? "600px" : "400px",
           maxHeight: "90vh",
           overflowY: "auto",
         }}
       >
-        <h2>Select Payment Method</h2>
+        <h2 style={{ fontSize: isExpanded ? "2rem" : "1.5rem" }}>Select Payment Method</h2>
 
         <div style={{ marginTop: "1rem" }}>
           <button
             onClick={() => setSelectedMethod("Card")}
             style={{
               marginRight: "1rem",
-              padding: "0.5rem 1rem",
+              padding: isExpanded ? "1rem 2rem" : "0.5rem 1rem",
+              fontSize: isExpanded ? "1.3rem" : "1rem",
+              minHeight: isExpanded ? "60px" : "auto",
               background:
                 selectedMethod === "Card" ? "#2563eb" : "transparent",
               color: selectedMethod === "Card" ? "white" : "black",
@@ -103,7 +106,9 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal }) {
           <button
             onClick={() => setSelectedMethod("Cash")}
             style={{
-              padding: "0.5rem 1rem",
+              padding: isExpanded ? "1rem 2rem" : "0.5rem 1rem",
+              fontSize: isExpanded ? "1.3rem" : "1rem",
+              minHeight: isExpanded ? "60px" : "auto",
               background:
                 selectedMethod === "Cash" ? "#2563eb" : "transparent",
               color: selectedMethod === "Cash" ? "white" : "black",
@@ -128,7 +133,8 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal }) {
                 setError("");
               }}
               style={{
-                padding: "0.5rem",
+                padding: isExpanded ? "1rem" : "0.5rem",
+                fontSize: isExpanded ? "1.2rem" : "1rem",
                 width: "100%",
                 border: "1px solid #ccc",
                 borderRadius: "5px",
@@ -148,13 +154,14 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal }) {
             <button
               onClick={() => handleTipButton(15)}
               style={{
-                padding: "0.4rem 0.8rem",
+                padding: isExpanded ? "0.8rem 1.5rem" : "0.4rem 0.8rem",
+                fontSize: isExpanded ? "1.2rem" : "0.9rem",
+                minHeight: isExpanded ? "50px" : "auto",
                 background: tipAmount === "15" && tipType === "percent" ? "#2563eb" : "#f0f0f0",
                 color: tipAmount === "15" && tipType === "percent" ? "white" : "black",
                 border: "1px solid #ccc",
                 borderRadius: "5px",
                 cursor: "pointer",
-                fontSize: "0.9rem",
               }}
             >
               15%
@@ -162,13 +169,14 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal }) {
             <button
               onClick={() => handleTipButton(18)}
               style={{
-                padding: "0.4rem 0.8rem",
+                padding: isExpanded ? "0.8rem 1.5rem" : "0.4rem 0.8rem",
+                fontSize: isExpanded ? "1.2rem" : "0.9rem",
+                minHeight: isExpanded ? "50px" : "auto",
                 background: tipAmount === "18" && tipType === "percent" ? "#2563eb" : "#f0f0f0",
                 color: tipAmount === "18" && tipType === "percent" ? "white" : "black",
                 border: "1px solid #ccc",
                 borderRadius: "5px",
                 cursor: "pointer",
-                fontSize: "0.9rem",
               }}
             >
               18%
@@ -176,13 +184,14 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal }) {
             <button
               onClick={() => handleTipButton(20)}
               style={{
-                padding: "0.4rem 0.8rem",
+                padding: isExpanded ? "0.8rem 1.5rem" : "0.4rem 0.8rem",
+                fontSize: isExpanded ? "1.2rem" : "0.9rem",
+                minHeight: isExpanded ? "50px" : "auto",
                 background: tipAmount === "20" && tipType === "percent" ? "#2563eb" : "#f0f0f0",
                 color: tipAmount === "20" && tipType === "percent" ? "white" : "black",
                 border: "1px solid #ccc",
                 borderRadius: "5px",
                 cursor: "pointer",
-                fontSize: "0.9rem",
               }}
             >
               20%
@@ -190,13 +199,14 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal }) {
             <button
               onClick={() => handleTipButton(25)}
               style={{
-                padding: "0.4rem 0.8rem",
+                padding: isExpanded ? "0.8rem 1.5rem" : "0.4rem 0.8rem",
+                fontSize: isExpanded ? "1.2rem" : "0.9rem",
+                minHeight: isExpanded ? "50px" : "auto",
                 background: tipAmount === "25" && tipType === "percent" ? "#2563eb" : "#f0f0f0",
                 color: tipAmount === "25" && tipType === "percent" ? "white" : "black",
                 border: "1px solid #ccc",
                 borderRadius: "5px",
                 cursor: "pointer",
-                fontSize: "0.9rem",
               }}
             >
               25%
@@ -212,13 +222,14 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal }) {
                   setTipAmount("");
                 }}
                 style={{
-                  padding: "0.4rem 0.6rem",
+                  padding: isExpanded ? "0.8rem 1rem" : "0.4rem 0.6rem",
+                  fontSize: isExpanded ? "1.1rem" : "0.85rem",
+                  minHeight: isExpanded ? "50px" : "auto",
                   background: tipType === "percent" ? "#2563eb" : "#f0f0f0",
                   color: tipType === "percent" ? "white" : "black",
                   border: "1px solid #ccc",
                   borderRadius: "5px 0 0 5px",
                   cursor: "pointer",
-                  fontSize: "0.85rem",
                 }}
               >
                 %
@@ -229,13 +240,14 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal }) {
                   setTipAmount("");
                 }}
                 style={{
-                  padding: "0.4rem 0.6rem",
+                  padding: isExpanded ? "0.8rem 1rem" : "0.4rem 0.6rem",
+                  fontSize: isExpanded ? "1.1rem" : "0.85rem",
+                  minHeight: isExpanded ? "50px" : "auto",
                   background: tipType === "dollar" ? "#2563eb" : "#f0f0f0",
                   color: tipType === "dollar" ? "white" : "black",
                   border: "1px solid #ccc",
                   borderRadius: "0 5px 5px 0",
                   cursor: "pointer",
-                  fontSize: "0.85rem",
                 }}
               >
                 $
@@ -251,7 +263,8 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal }) {
                 setError("");
               }}
               style={{
-                padding: "0.5rem",
+                padding: isExpanded ? "1rem" : "0.5rem",
+                fontSize: isExpanded ? "1.2rem" : "1rem",
                 flex: 2,
                 border: "1px solid #ccc",
                 borderRadius: "5px",
@@ -273,7 +286,9 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal }) {
             style={{
               background: selectedMethod ? "#2563eb" : "#ccc",
               color: "white",
-              padding: "0.5rem 1rem",
+              padding: isExpanded ? "1.25rem 2rem" : "0.5rem 1rem",
+              fontSize: isExpanded ? "1.3rem" : "1rem",
+              minHeight: isExpanded ? "60px" : "auto",
               border: "none",
               borderRadius: "5px",
               cursor: selectedMethod ? "pointer" : "not-allowed",
@@ -292,6 +307,9 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal }) {
               border: "none",
               color: "#555",
               cursor: "pointer",
+              padding: isExpanded ? "1rem 2rem" : "0.5rem 1rem",
+              fontSize: isExpanded ? "1.2rem" : "1rem",
+              minHeight: isExpanded ? "50px" : "auto",
             }}
           >
             Cancel

@@ -16,7 +16,7 @@ const SWEETNESS_OPTIONS = [
   { value: "100%", label: "100% (Full Sweet)" },
 ];
 
-function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart }) {
+function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpanded = false }) {
   const [addOns, setAddOns] = useState([]);
   const [selectedAddOns, setSelectedAddOns] = useState([]);
   const [iceLevel, setIceLevel] = useState("normal");
@@ -90,7 +90,7 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart }) {
   return (
     <div className="customization-modal-overlay" onClick={onClose}>
       <div
-        className="customization-modal"
+        className={`customization-modal ${isExpanded ? 'customization-modal-expanded' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="customization-modal-header">
