@@ -1,9 +1,33 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import "./KioskView.css";
 
 function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, onSwitchToCashier, user, onLoginClick, onLogout, isExpanded, onToggleExpanded }) {
   const [filter, setFilter] = useState("all");
   const [currentStep, setCurrentStep] = useState("menu"); // "menu" or "cart"
+  const [language, setLanguage] = useState("en"); // "en" or "es"
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const languageDropdownRef = useRef(null);
+
+  const languages = {
+    en: "English",
+    es: "Español"
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (languageDropdownRef.current && !languageDropdownRef.current.contains(event.target)) {
+        setShowLanguageDropdown(false);
+      }
+    };
+
+    if (showLanguageDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showLanguageDropdown]);
 
   const cartItems = Object.values(cart);
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -30,6 +54,36 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
                 <span className="cart-icon">🛒</span>
                 Current Order
               </h2>
+              <div className="kiosk-language-selector" ref={languageDropdownRef}>
+                <button 
+                  className="kiosk-translate-button"
+                  onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                >
+                  🌐 {languages[language]}
+                </button>
+                {showLanguageDropdown && (
+                  <div className="kiosk-language-dropdown">
+                    <button
+                      className={`kiosk-language-option ${language === "en" ? "active" : ""}`}
+                      onClick={() => {
+                        setLanguage("en");
+                        setShowLanguageDropdown(false);
+                      }}
+                    >
+                      English
+                    </button>
+                    <button
+                      className={`kiosk-language-option ${language === "es" ? "active" : ""}`}
+                      onClick={() => {
+                        setLanguage("es");
+                        setShowLanguageDropdown(false);
+                      }}
+                    >
+                      Español
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 className="kiosk-mode-toggle"
                 onClick={onSwitchToCashier}
@@ -112,6 +166,36 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="kiosk-language-selector" ref={languageDropdownRef}>
+            <button 
+              className="kiosk-translate-button"
+              onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+            >
+              🌐 {languages[language]}
+            </button>
+            {showLanguageDropdown && (
+              <div className="kiosk-language-dropdown">
+                <button
+                  className={`kiosk-language-option ${language === "en" ? "active" : ""}`}
+                  onClick={() => {
+                    setLanguage("en");
+                    setShowLanguageDropdown(false);
+                  }}
+                >
+                  English
+                </button>
+                <button
+                  className={`kiosk-language-option ${language === "es" ? "active" : ""}`}
+                  onClick={() => {
+                    setLanguage("es");
+                    setShowLanguageDropdown(false);
+                  }}
+                >
+                  Español
+                </button>
+              </div>
+            )}
+          </div>
           <button
             className="kiosk-mode-toggle"
             onClick={onToggleExpanded}

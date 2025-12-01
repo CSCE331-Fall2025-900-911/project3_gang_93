@@ -97,6 +97,70 @@
   border-color: #5568d3;
 }
 
+.kiosk-language-selector {
+  position: relative;
+}
+
+.kiosk-translate-button {
+  background: white;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  min-height: 45px;
+}
+
+.kiosk-translate-button:hover {
+  border-color: #999;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: #f9f9f9;
+}
+
+.kiosk-language-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.5rem;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 150px;
+  overflow: hidden;
+}
+
+.kiosk-language-option {
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  background: white;
+  color: #333;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+  display: block;
+}
+
+.kiosk-language-option:hover {
+  background: #f0f0f0;
+}
+
+.kiosk-language-option.active {
+  background: #667eea;
+  color: white;
+}
+
 .kiosk-mode-toggle {
   background: white;
   color: #333;
@@ -432,6 +496,17 @@
   margin-top: 0.75rem;
 }
 
+.kiosk-view-expanded .kiosk-translate-button {
+  padding: 1.25rem 2rem;
+  font-size: 1.3rem;
+  min-height: 60px;
+}
+
+.kiosk-view-expanded .kiosk-language-option {
+  padding: 1rem 1.5rem;
+  font-size: 1.2rem;
+}
+
 .kiosk-view-expanded .kiosk-mode-toggle,
 .kiosk-view-expanded .kiosk-cart-badge,
 .kiosk-view-expanded .kiosk-login-button,
@@ -444,6 +519,7 @@
   font-size: 1.3rem;
   min-height: 60px;
 }
+
 
 .kiosk-view-expanded .kiosk-mode-toggle {
   width: 60px;
