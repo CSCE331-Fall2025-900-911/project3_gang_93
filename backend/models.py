@@ -218,3 +218,12 @@ class ProductUsageResponse(BaseModel):
     products: List[ProductUsageData]
     totalProducts: int
 
+# Weather Models
+class WeatherResponse(BaseModel):
+    city: str
+    temperature: float
+    description: str
+    humidity: int
+    windSpeed: float
+    icon: str
+

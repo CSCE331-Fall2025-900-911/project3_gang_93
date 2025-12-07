@@ -1715,6 +1715,105 @@ def get_product_usage(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating Product Usage Report: {str(e)}")
 
+# ================== WEATHER API ==================
+
+def get_wmo_description(code: int) -> tuple[str, str]:
+    """
+    Map WMO weather codes to description and icon.
+    Returns: (description, icon_code)
+    """
+    # WMO Weather interpretation codes (WW)
+    if code == 0:
+        return "Clear sky", "01d"
+    elif code in [1, 2, 3]:
+        return "Partly cloudy", "02d"
+    elif code in [45, 48]:
+        return "Fog", "50d"
+    elif code in [51, 53, 55]:
+        return "Drizzle", "09d"
+    elif code in [56, 57]:
+        return "Freezing Drizzle", "09d"
+    elif code in [61, 63, 65]:
+        return "Rain", "10d"
+    elif code in [66, 67]:
+        return "Freezing Rain", "13d"
+    elif code in [71, 73, 75]:
+        return "Snow fall", "13d"
+    elif code == 77:
+        return "Snow grains", "13d"
+    elif code in [80, 81, 82]:
+        return "Rain showers", "09d"
+    elif code in [85, 86]:
+        return "Snow showers", "13d"
+    elif code == 95:
+        return "Thunderstorm", "11d"
+    elif code in [96, 99]:
+        return "Thunderstorm with hail", "11d"
+    else:
+        return "Unknown", "03d"
+
+@app.get("/api/weather", response_model=WeatherResponse)
+def get_weather(city: str = "College Station"):
+    """Get current weather for a city (using Open-Meteo)"""
+    try:
+        # Step 1: Get coordinates for the city using Open-Meteo Geocoding
+        geo_url = "https://geocoding-api.open-meteo.com/v1/search"
+        geo_params = {
+            "name": city,
+            "count": 1,
+            "language": "en",
+            "format": "json"
+        }
+        
+        geo_response = requests.get(geo_url, params=geo_params)
+        
+        if geo_response.status_code != 200:
+            raise HTTPException(status_code=502, detail="Geocoding service unavailable")
+            
+        geo_data = geo_response.json()
+        
+        if not geo_data.get("results"):
+            raise HTTPException(status_code=404, detail="City not found")
+            
+        location = geo_data["results"][0]
+        lat = location["latitude"]
+        lon = location["longitude"]
+        city_name = location["name"]
+
+        # Step 2: Get weather data using Open-Meteo API
+        weather_url = "https://api.open-meteo.com/v1/forecast"
+        weather_params = {
+            "latitude": lat,
+            "longitude": lon,
+            "current": "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m",
+            "temperature_unit": "fahrenheit",
+            "wind_speed_unit": "mph"
+        }
+        
+        response = requests.get(weather_url, params=weather_params)
+        
+        if response.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Weather service unavailable: {response.text}")
+            
+        data = response.json()
+        current = data["current"]
+        
+        description, icon = get_wmo_description(current["weather_code"])
+        
+        return {
+            "city": city_name,
+            "temperature": float(current["temperature_2m"]),
+            "description": description,
+            "humidity": int(current["relative_humidity_2m"]),
+            "windSpeed": float(current["wind_speed_10m"]),
+            "icon": icon
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Weather API error: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
