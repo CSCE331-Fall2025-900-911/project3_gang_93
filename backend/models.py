@@ -10,9 +10,22 @@ class MenuItem(BaseModel):
     menuItemName: str
     price: Decimal
     ingredients: Any  # JSONB field
+    isSeasonal: bool
 
 class MenuResponse(BaseModel):
     menuItems: List[MenuItem]
+
+class MenuItemCreate(BaseModel):
+    menuItemName: str
+    price: Decimal
+    ingredients: Any  # JSONB field
+    isSeasonal: bool = False
+
+class MenuItemUpdate(BaseModel):
+    menuItemName: Optional[str] = None
+    price: Optional[Decimal] = None
+    ingredients: Optional[Any] = None
+    isSeasonal: Optional[bool] = None
 
 # Add-On Models
 class AddOnItem(BaseModel):

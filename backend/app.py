@@ -1,5 +1,5 @@
 """FastAPI application for POS System"""
-from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Header, Depends
 from google.auth.transport import requests as gauth_requests
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
@@ -37,6 +37,61 @@ app.add_middleware(
 def root():
     return {"message": "POS System API", "version": "1.0.0"}
 
+# ================== AUTH HELPERS ==================
+
+def verify_manager_auth(
+    x_employee_id: Optional[str] = Header(None, alias="X-Employee-Id"),
+    x_auth_level: Optional[str] = Header(None, alias="X-Auth-Level")
+):
+    """
+    Verify that the request comes from an authenticated manager.
+    Checks X-Employee-Id and X-Auth-Level headers and validates against database.
+    """
+    # Check if headers are provided
+    if not x_employee_id or not x_auth_level:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Please provide X-Employee-Id and X-Auth-Level headers."
+        )
+    
+    try:
+        employee_id = int(x_employee_id)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid employee ID format")
+    
+    # Verify employee exists and has Manager role
+    try:
+        query = """
+            SELECT employeeId, firstName, lastName, authLevel
+            FROM employees
+            WHERE employeeId = %s
+        """
+        employee = execute_query(query, (employee_id,), fetch_one=True)
+        
+        if not employee:
+            raise HTTPException(status_code=401, detail="Employee not found")
+        
+        # Check if the employee's actual auth level matches the header
+        if employee['authlevel'] != x_auth_level:
+            raise HTTPException(
+                status_code=403,
+                detail="Authorization level mismatch"
+            )
+        
+        # Check if the employee is a Manager
+        if employee['authlevel'] != 'Manager':
+            raise HTTPException(
+                status_code=403,
+                detail="Manager access required. Only managers can perform this action."
+            )
+        
+        return employee
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Authentication error: {str(e)}")
+
 # ================== MENU APIs ==================
 
 @app.get("/api/menu", response_model=MenuResponse)
@@ -44,7 +99,7 @@ def get_menu():
     """Get all menu items"""
     try:
         query = """
-            SELECT menuItemId, menuItemName, price, ingredients
+            SELECT menuItemId, menuItemName, price, ingredients, isSeasonal
             FROM menu
             ORDER BY menuItemId
         """
@@ -57,7 +112,8 @@ def get_menu():
                 "menuItemId": item['menuitemid'],
                 "menuItemName": item['menuitemname'],
                 "price": float(item['price']),
-                "ingredients": item['ingredients']
+                "ingredients": item['ingredients'],
+                "isSeasonal": item['isseasonal']
             })
         
         return {"menuItems": menu_items}
@@ -69,7 +125,7 @@ def get_menu_item(menu_item_id: int):
     """Get a specific menu item by ID"""
     try:
         query = """
-            SELECT menuItemId, menuItemName, price, ingredients
+            SELECT menuItemId, menuItemName, price, ingredients, isSeasonal
             FROM menu
             WHERE menuItemId = %s
         """
@@ -82,8 +138,127 @@ def get_menu_item(menu_item_id: int):
             "menuItemId": item['menuitemid'],
             "menuItemName": item['menuitemname'],
             "price": float(item['price']),
-            "ingredients": item['ingredients']
+            "ingredients": item['ingredients'],
+            "isSeasonal": item['isseasonal']
         }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+@app.post("/api/menu", response_model=MenuItem)
+def create_menu_item(item: MenuItemCreate, auth: dict = Depends(verify_manager_auth)):
+    """Create a new menu item (Manager only)"""
+    try:
+        # Get the next available menuItemId
+        query_max_id = "SELECT COALESCE(MAX(menuItemId), 100) as max_id FROM menu"
+        result = execute_query(query_max_id, fetch_one=True)
+        next_id = result['max_id'] + 1
+        
+        # Insert the new menu item
+        insert_query = """
+            INSERT INTO menu (menuItemId, menuItemName, price, ingredients, isSeasonal)
+            VALUES (%s, %s, %s, %s::jsonb, %s)
+            RETURNING menuItemId, menuItemName, price, ingredients, isSeasonal
+        """
+        
+        new_item = execute_query(
+            insert_query,
+            (next_id, item.menuItemName, float(item.price), json.dumps(item.ingredients), item.isSeasonal),
+            fetch_one=True
+        )
+        
+        return {
+            "menuItemId": new_item['menuitemid'],
+            "menuItemName": new_item['menuitemname'],
+            "price": float(new_item['price']),
+            "ingredients": new_item['ingredients'],
+            "isSeasonal": new_item['isseasonal']
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+@app.put("/api/menu/{menu_item_id}", response_model=MenuItem)
+def update_menu_item(menu_item_id: int, item: MenuItemUpdate, auth: dict = Depends(verify_manager_auth)):
+    """Update an existing menu item (Manager only)"""
+    try:
+        # Check if the menu item exists
+        check_query = "SELECT menuItemId FROM menu WHERE menuItemId = %s"
+        existing = execute_query(check_query, (menu_item_id,), fetch_one=True)
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="Menu item not found")
+        
+        # Build dynamic update query based on provided fields
+        update_fields = []
+        params = []
+        
+        if item.menuItemName is not None:
+            update_fields.append("menuItemName = %s")
+            params.append(item.menuItemName)
+        
+        if item.price is not None:
+            update_fields.append("price = %s")
+            params.append(float(item.price))
+        
+        if item.ingredients is not None:
+            update_fields.append("ingredients = %s::jsonb")
+            params.append(json.dumps(item.ingredients))
+        
+        if item.isSeasonal is not None:
+            update_fields.append("isSeasonal = %s")
+            params.append(item.isSeasonal)
+        
+        if not update_fields:
+            # No fields to update, just return the existing item
+            query = """
+                SELECT menuItemId, menuItemName, price, ingredients, isSeasonal
+                FROM menu
+                WHERE menuItemId = %s
+            """
+            result = execute_query(query, (menu_item_id,), fetch_one=True)
+        else:
+            # Perform the update
+            params.append(menu_item_id)
+            update_query = f"""
+                UPDATE menu
+                SET {', '.join(update_fields)}
+                WHERE menuItemId = %s
+                RETURNING menuItemId, menuItemName, price, ingredients, isSeasonal
+            """
+            result = execute_query(update_query, tuple(params), fetch_one=True)
+        
+        return {
+            "menuItemId": result['menuitemid'],
+            "menuItemName": result['menuitemname'],
+            "price": float(result['price']),
+            "ingredients": result['ingredients'],
+            "isSeasonal": result['isseasonal']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+@app.delete("/api/menu/{menu_item_id}")
+def delete_menu_item(menu_item_id: int, auth: dict = Depends(verify_manager_auth)):
+    """Delete a menu item (Manager only)"""
+    try:
+        # Check if the menu item exists
+        check_query = "SELECT menuItemId FROM menu WHERE menuItemId = %s"
+        existing = execute_query(check_query, (menu_item_id,), fetch_one=True)
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="Menu item not found")
+        
+        # Delete the menu item
+        delete_query = "DELETE FROM menu WHERE menuItemId = %s"
+        execute_query(delete_query, (menu_item_id,), fetch_all=False)
+        
+        return {"message": "Menu item deleted successfully", "menuItemId": menu_item_id}
+        
     except HTTPException:
         raise
     except Exception as e:

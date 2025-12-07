@@ -55,7 +55,8 @@ CREATE TABLE menu (
     menuItemId INT PRIMARY KEY,
     menuItemName VARCHAR(100) NOT NULL,
     price DECIMAL(10, 2) NOT NULL CHECK (price > 0),
-    ingredients JSONB NOT NULL  -- PostgreSQL native JSON type
+    ingredients JSONB NOT NULL,  -- PostgreSQL native JSON type
+    isSeasonal BOOLEAN DEFAULT false
 );
 
 -- Add-Ons Table
