@@ -15,5 +15,6 @@ export { default as CustomerManagement } from './CustomerManagement'
 export { default as EmployeeManagement } from './EmployeeManagement'
 export { default as KioskLoginPage } from './KioskLoginPage'
 export { default as EmployeeLoginPage } from './EmployeeLoginPage'
+export { default as WeatherWidget } from './WeatherWidget'
 export { default as DrinkCustomizationModal } from './DrinkCustomizationModal'
 

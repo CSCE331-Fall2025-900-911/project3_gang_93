@@ -327,6 +327,15 @@ export const authAPI = {
 };
 
 /**
+ * Weather API
+ */
+export const weatherAPI = {
+  getWeather: async (city = "College Station") => {
+    return await apiRequest(`${API_ENDPOINTS.WEATHER}?city=${encodeURIComponent(city)}`);
+  },
+};
+
+/**
  * Customer API - Extended
  */
 export const customerAPIExtended = {
@@ -368,5 +377,6 @@ export default {
   managementAPI,
   employeeAPI,
   authAPI,
+  weatherAPI,
   testConnection,
 };
