@@ -310,6 +310,23 @@ export const employeeAPI = {
 };
 
 /**
+ * Auth API
+ */
+export const authAPI = {
+  login: async (employeeId) => {
+    return await apiRequest(`${API_ENDPOINTS.AUTH}/login`, {
+      method: "POST",
+      body: JSON.stringify({ employeeId }),
+    });
+  },
+  logout: async () => {
+    return await apiRequest(`${API_ENDPOINTS.AUTH}/logout`, {
+      method: "POST",
+    });
+  },
+};
+
+/**
  * Customer API - Extended
  */
 export const customerAPIExtended = {
@@ -350,5 +367,6 @@ export default {
   reportsAPI,
   managementAPI,
   employeeAPI,
+  authAPI,
   testConnection,
 };

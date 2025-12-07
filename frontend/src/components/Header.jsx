@@ -1,16 +1,27 @@
 import NavButton from './NavButton'
 import './Header.css'
 
-function Header({ viewMode, onViewModeChange, onManagerClick }) {
+function Header({ viewMode, onViewModeChange, onManagerClick, employee, onLogout }) {
   const navItems = [
     { icon: '⚙️', label: 'Manage', onClick: onManagerClick },
-    { icon: '📤', label: 'Log Out' },
+    { icon: '📤', label: 'Log Out', onClick: onLogout },
   ]
 
   return (
     <header className="header">
       <h1 className="header-title">POS System</h1>
       <nav className="header-nav">
+        {employee && (
+          <div className="employee-info">
+            <span className="employee-name">
+              {employee.firstName} {employee.lastName}
+            </span>
+            <span className="employee-role">
+              ({employee.authLevel})
+            </span>
+            <span className="nav-divider">|</span>
+          </div>
+        )}
         <div className="nav-item-wrapper">
           <button
             className="view-toggle-button"

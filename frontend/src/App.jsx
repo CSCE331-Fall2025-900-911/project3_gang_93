@@ -9,6 +9,7 @@ import KioskView from "./components/KioskView";
 import ManagerView from "./components/ManagerView";
 import DrinkCustomizationModal from "./components/DrinkCustomizationModal";
 import KioskLoginPage from "./components/KioskLoginPage";
+import EmployeeLoginPage from "./components/EmployeeLoginPage";
 import "./App.css";
 
 function App() {
@@ -25,6 +26,9 @@ function App() {
   const [kioskUser, setKioskUser] = useState(null);
   const [showKioskLogin, setShowKioskLogin] = useState(false);
   const [isKioskExpanded, setIsKioskExpanded] = useState(false);
+  const [employee, setEmployee] = useState(null);
+  const [showEmployeeLogin, setShowEmployeeLogin] = useState(false);
+  const [showManagerLogin, setShowManagerLogin] = useState(false);
 
   // Check for existing kiosk user session and OAuth callback on mount
   useEffect(() => {
@@ -49,6 +53,22 @@ function App() {
         setKioskUser(userInfo);
       } catch (e) {
         localStorage.removeItem("kiosk_user");
+      }
+    }
+
+    // Check for stored employee session
+    const storedEmployee = localStorage.getItem("employee");
+    if (storedEmployee) {
+      try {
+        const employeeInfo = JSON.parse(storedEmployee);
+        setEmployee(employeeInfo);
+      } catch (e) {
+        localStorage.removeItem("employee");
+      }
+    } else {
+      // If no employee session and in cashier mode, show login
+      if (viewMode === "cashier") {
+        setShowEmployeeLogin(true);
       }
     }
   }, []);
@@ -201,7 +221,13 @@ function App() {
   };
 
   const toggleViewMode = () => {
-    setViewMode((prev) => (prev === "cashier" ? "kiosk" : "cashier"));
+    const newMode = viewMode === "cashier" ? "kiosk" : "cashier";
+    setViewMode(newMode);
+    
+    // If switching to cashier mode and not logged in, show login
+    if (newMode === "cashier" && !employee) {
+      setShowEmployeeLogin(true);
+    }
   };
 
   const handleKioskLoginSuccess = (userInfo) => {
@@ -222,9 +248,78 @@ function App() {
     setCart({});
   };
 
-  // Show manager view if requested
+  const handleEmployeeLoginSuccess = (employeeInfo) => {
+    console.log("[App] Employee login success:", employeeInfo);
+    setEmployee(employeeInfo);
+    setShowEmployeeLogin(false);
+    localStorage.setItem("employee", JSON.stringify(employeeInfo));
+  };
+
+  const handleEmployeeLogout = () => {
+    localStorage.removeItem("employee");
+    setEmployee(null);
+    setCart({});
+    setShowEmployeeLogin(true);
+  };
+
+  const handleManagerClick = () => {
+    if (!employee) {
+      setShowEmployeeLogin(true);
+      return;
+    }
+    if (employee.authLevel !== "Manager") {
+      setShowManagerLogin(true);
+      return;
+    }
+    setShowManager(true);
+  };
+
+  // Show manager login if trying to access manager view without manager auth
+  if (showManagerLogin) {
+    return (
+      <div className="app">
+        <EmployeeLoginPage
+          title="Manager Login"
+          subtitle="Enter your manager employee ID to access the manager view"
+          onLoginSuccess={(employeeInfo) => {
+            if (employeeInfo.authLevel === "Manager") {
+              handleEmployeeLoginSuccess(employeeInfo);
+              setShowManagerLogin(false);
+              setShowManager(true);
+            } else {
+              alert("Access denied. Only managers can access this view.");
+            }
+          }}
+          onCancel={() => {
+            setShowManagerLogin(false);
+            if (!employee) {
+              setShowEmployeeLogin(true);
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Show employee login if not logged in and trying to access cashier view
+  if (showEmployeeLogin && viewMode === "cashier") {
+    return (
+      <div className="app">
+        <EmployeeLoginPage
+          onLoginSuccess={handleEmployeeLoginSuccess}
+          onCancel={() => {
+            // Switch to kiosk mode if canceling employee login
+            setShowEmployeeLogin(false);
+            setViewMode("kiosk");
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Show manager view if requested and authenticated
   if (showManager) {
-    return <ManagerView onBack={() => setShowManager(false)} />;
+    return <ManagerView onBack={() => setShowManager(false)} employee={employee} />;
   }
 
   if (loading) {
@@ -343,7 +438,9 @@ function App() {
       <Header
         viewMode={viewMode}
         onViewModeChange={toggleViewMode}
-        onManagerClick={() => setShowManager(true)}
+        onManagerClick={handleManagerClick}
+        employee={employee}
+        onLogout={handleEmployeeLogout}
       />
       <main className="main-content">
         <MenuGrid items={menuItems} onItemClick={handleItemClick} />
