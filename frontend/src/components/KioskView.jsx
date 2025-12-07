@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import WeatherWidget from "./WeatherWidget";
 import "./KioskView.css";
 
 function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, onSwitchToCashier, user, onLoginClick, onLogout, isExpanded, onToggleExpanded }) {
@@ -54,6 +55,7 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
                 <span className="cart-icon">🛒</span>
                 Current Order
               </h2>
+              <WeatherWidget city="College Station" />
               <div className="kiosk-language-selector" ref={languageDropdownRef}>
                 <button 
                   className="kiosk-translate-button"
@@ -166,6 +168,7 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <WeatherWidget city="College Station" />
           <div className="kiosk-language-selector" ref={languageDropdownRef}>
             <button 
               className="kiosk-translate-button"

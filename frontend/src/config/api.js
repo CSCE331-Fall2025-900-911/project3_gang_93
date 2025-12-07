@@ -15,5 +15,6 @@ export const API_ENDPOINTS = {
   AUTH: '/api/auth',
   MANAGEMENT: '/api/management',
   REPORTS: '/api/reports',
+  WEATHER: '/api/weather',
 };
 
