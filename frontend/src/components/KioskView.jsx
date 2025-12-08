@@ -29,6 +29,7 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
     all: "All",
     coffee: "Coffee",
     tea: "Tea",
+    seasonal: "Seasonal",
     customize: "+ Customize",
     noItemsFound: "No items found in this category.",
     signIn: "Sign In",
@@ -176,6 +177,13 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
   const filteredItems = filter === "all" 
     ? translatedMenuItems 
     : translatedMenuItems.filter(item => {
+        if (filter === "seasonal") {
+          const isSeasonal = item.isSeasonal === true;
+          if (isSeasonal) {
+            console.log(`[KioskView] Found seasonal item: ${item.name}`, item);
+          }
+          return isSeasonal;
+        }
         const name = (item.translatedName || item.name).toLowerCase();
         const originalName = item.name.toLowerCase();
         if (filter === "coffee") {
@@ -187,6 +195,18 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
         }
         return true;
       });
+  
+  // Debug: Log seasonal items when filter changes
+  useEffect(() => {
+    if (filter === "seasonal") {
+      const seasonalItems = translatedMenuItems.filter(item => item.isSeasonal === true);
+      console.log(`[KioskView] Seasonal filter active. Found ${seasonalItems.length} seasonal items:`, seasonalItems);
+      console.log(`[KioskView] All menu items with isSeasonal:`, translatedMenuItems.map(item => ({
+        name: item.name,
+        isSeasonal: item.isSeasonal
+      })));
+    }
+  }, [filter, translatedMenuItems]);
 
   if (currentStep === "cart" && cartItems.length > 0) {
     return (
@@ -404,6 +424,12 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
           onClick={() => setFilter("tea")}
         >
           {translations.tea || "Tea"}
+        </button>
+        <button
+          className={`kiosk-filter-button ${filter === "seasonal" ? "active" : ""}`}
+          onClick={() => setFilter("seasonal")}
+        >
+          🌿 {translations.seasonal || "Seasonal"}
         </button>
       </div>
 

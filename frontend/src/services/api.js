@@ -57,14 +57,22 @@ export const menuAPI = {
   getAll: async () => {
     const data = await apiRequest(API_ENDPOINTS.MENU);
     // Transform backend response to frontend format
-    return data.menuItems.map((item) => ({
+    const items = data.menuItems.map((item) => ({
       id: item.menuItemId,
       menuItemId: item.menuItemId,
       name: item.menuItemName,
       price: parseFloat(item.price),
       ingredients: item.ingredients,
       icon: getMenuIcon(item.menuItemName),
+      isSeasonal: Boolean(item.isSeasonal) === true,
     }));
+    // Debug: Log seasonal items
+    const seasonalCount = items.filter(item => item.isSeasonal === true).length;
+    console.log(`[menuAPI] Loaded ${items.length} menu items, ${seasonalCount} are seasonal`);
+    if (seasonalCount > 0) {
+      console.log(`[menuAPI] Seasonal items:`, items.filter(item => item.isSeasonal === true).map(item => item.name));
+    }
+    return items;
   },
 
   // Get single menu item
@@ -77,7 +85,61 @@ export const menuAPI = {
       price: parseFloat(data.price),
       ingredients: data.ingredients,
       icon: getMenuIcon(data.menuItemName),
+      isSeasonal: data.isSeasonal || false,
     };
+  },
+
+  // Create a new menu item
+  create: async (itemData) => {
+    const payload = {
+      menuItemName: itemData.name,
+      price: itemData.price,
+      ingredients: itemData.ingredients || [],
+      isSeasonal: itemData.isSeasonal || false,
+    };
+    const data = await apiRequest(API_ENDPOINTS.MENU, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return {
+      id: data.menuItemId,
+      menuItemId: data.menuItemId,
+      name: data.menuItemName,
+      price: parseFloat(data.price),
+      ingredients: data.ingredients,
+      icon: getMenuIcon(data.menuItemName),
+      isSeasonal: data.isSeasonal || false,
+    };
+  },
+
+  // Update an existing menu item
+  update: async (id, itemData) => {
+    const payload = {};
+    if (itemData.name !== undefined) payload.menuItemName = itemData.name;
+    if (itemData.price !== undefined) payload.price = itemData.price;
+    if (itemData.ingredients !== undefined) payload.ingredients = itemData.ingredients;
+    if (itemData.isSeasonal !== undefined) payload.isSeasonal = itemData.isSeasonal;
+
+    const data = await apiRequest(`${API_ENDPOINTS.MENU}/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+    return {
+      id: data.menuItemId,
+      menuItemId: data.menuItemId,
+      name: data.menuItemName,
+      price: parseFloat(data.price),
+      ingredients: data.ingredients,
+      icon: getMenuIcon(data.menuItemName),
+      isSeasonal: data.isSeasonal || false,
+    };
+  },
+
+  // Delete a menu item
+  delete: async (id) => {
+    return await apiRequest(`${API_ENDPOINTS.MENU}/${id}`, {
+      method: "DELETE",
+    });
   },
 };
 

@@ -4,6 +4,7 @@ import InventoryManagement from "./InventoryManagement";
 import Reports from "./Reports";
 import CustomerManagement from "./CustomerManagement";
 import EmployeeManagement from "./EmployeeManagement";
+import MenuManagement from "./MenuManagement";
 import "./ManagerView.css";
 
 function ManagerView({ onBack }) {
@@ -19,6 +20,8 @@ function ManagerView({ onBack }) {
         return <ManagerDashboard onNavigate={handleNavigate} />;
       case "inventory":
         return <InventoryManagement />;
+      case "menu":
+        return <MenuManagement />;
       case "reports":
         return <Reports />;
       case "customers":
@@ -51,6 +54,12 @@ function ManagerView({ onBack }) {
             onClick={() => setCurrentView("inventory")}
           >
             📦 Inventory
+          </button>
+          <button
+            className={`nav-item ${currentView === "menu" ? "active" : ""}`}
+            onClick={() => setCurrentView("menu")}
+          >
+            🍽️ Menu
           </button>
           <button
             className={`nav-item ${currentView === "reports" ? "active" : ""}`}

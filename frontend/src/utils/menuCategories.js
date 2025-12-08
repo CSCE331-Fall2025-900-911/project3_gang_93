@@ -21,6 +21,10 @@ export const filterMenuItems = (items, category) => {
     return items;
   }
   
+  if (category === 'seasonal') {
+    return items.filter(item => item.isSeasonal === true);
+  }
+  
   return items.filter(item => getItemCategory(item.name) === category);
 };
 

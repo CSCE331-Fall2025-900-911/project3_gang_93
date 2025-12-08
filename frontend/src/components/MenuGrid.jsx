@@ -31,6 +31,12 @@ function MenuGrid({ items, onItemClick }) {
         >
           Tea
         </button>
+        <button 
+          className={`filter-button ${filter === 'seasonal' ? 'active' : ''}`}
+          onClick={() => setFilter('seasonal')}
+        >
+          🌿 Seasonal
+        </button>
       </div>
       
       <div className="menu-grid">
