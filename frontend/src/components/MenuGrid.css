@@ -11,6 +11,9 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  line-height: 1.3;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .menu-filters {
@@ -30,6 +33,11 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  text-align: center;
+  line-height: 1.4;
 }
 
 .filter-button:hover {
@@ -62,15 +70,60 @@
   font-size: 1rem;
 }
 
+@media (max-width: 1400px) {
+  .menu-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+  }
+}
+
 @media (max-width: 1200px) {
   .menu-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
   }
 }
 
 @media (max-width: 768px) {
+  .menu-section {
+    padding: 0 1rem;
+  }
+
+  .section-title {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .menu-filters {
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .filter-button {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    flex: 1;
+    min-width: calc(50% - 0.25rem);
+  }
+
   .menu-grid {
     grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .menu-section {
+    padding: 0 0.5rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+  }
+
+  .filter-button {
+    font-size: 0.85rem;
+    padding: 0.45rem 0.75rem;
   }
 }
 

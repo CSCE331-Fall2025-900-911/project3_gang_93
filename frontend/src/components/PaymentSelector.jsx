@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { translate, translateBatch } from "../utils/translation";
+import "./PaymentSelector.css";
 
 // UI text keys (defined outside component to avoid dependency issues)
 const UI_TEXT_KEYS = {
@@ -115,75 +116,31 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
   };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100vw",
-        height: "100vh",
-        background: "rgba(0,0,0,0.5)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 1000,
-      }}
-    >
+    <div className="payment-selector-overlay">
       <div
-        className={isExpanded ? "payment-selector-expanded" : ""}
-        style={{
-          background: "#fff",
-          padding: isExpanded ? "3rem" : "2rem",
-          borderRadius: "10px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-          textAlign: "center",
-          width: isExpanded ? "600px" : "400px",
-          maxHeight: "90vh",
-          overflowY: "auto",
-        }}
+        className={`payment-selector-content ${isExpanded ? "payment-selector-content-expanded" : ""}`}
       >
-        <h2 style={{ fontSize: isExpanded ? "2rem" : "1.5rem" }}>
+        <h2 className="payment-selector-title">
           {translations.selectPaymentMethod || "Select Payment Method"}
         </h2>
 
-        <div style={{ marginTop: "1rem" }}>
+        <div className="payment-methods">
           <button
             onClick={() => setSelectedMethod("Card")}
-            style={{
-              marginRight: "1rem",
-              padding: isExpanded ? "1rem 2rem" : "0.5rem 1rem",
-              fontSize: isExpanded ? "1.3rem" : "1rem",
-              minHeight: isExpanded ? "60px" : "auto",
-              background:
-                selectedMethod === "Card" ? "#2563eb" : "transparent",
-              color: selectedMethod === "Card" ? "white" : "black",
-              border: "1px solid #ccc",
-              borderRadius: "5px",
-              cursor: "pointer",
-            }}
+            className={`payment-method-button ${selectedMethod === "Card" ? "selected" : ""}`}
           >
             💳 {translations.card || "Card"}
           </button>
           <button
             onClick={() => setSelectedMethod("Cash")}
-            style={{
-              padding: isExpanded ? "1rem 2rem" : "0.5rem 1rem",
-              fontSize: isExpanded ? "1.3rem" : "1rem",
-              minHeight: isExpanded ? "60px" : "auto",
-              background:
-                selectedMethod === "Cash" ? "#2563eb" : "transparent",
-              color: selectedMethod === "Cash" ? "white" : "black",
-              border: "1px solid #ccc",
-              borderRadius: "5px",
-              cursor: "pointer",
-            }}
+            className={`payment-method-button ${selectedMethod === "Cash" ? "selected" : ""}`}
           >
             💵 {translations.cash || "Cash"}
           </button>
         </div>
 
         {selectedMethod === "Cash" && (
-          <div style={{ marginTop: "1rem" }}>
+          <div className="cash-input-container">
             <input
               type="number"
               step="0.01"
@@ -193,107 +150,55 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
                 setCashAmount(e.target.value);
                 setError("");
               }}
-              style={{
-                padding: isExpanded ? "1rem" : "0.5rem",
-                fontSize: isExpanded ? "1.2rem" : "1rem",
-                width: "100%",
-                border: "1px solid #ccc",
-                borderRadius: "5px",
-                marginBottom: "0.5rem",
-              }}
+              className="cash-input"
             />
-            {error && <p style={{ color: "red", fontSize: "0.9rem" }}>{error}</p>}
+            {error && <p className="error-message">{error}</p>}
           </div>
         )}
 
         {/* Tip Section */}
-        <div style={{ marginTop: "1.5rem", borderTop: "1px solid #eee", paddingTop: "1rem" }}>
-          <h3 style={{ margin: "0 0 0.75rem 0", fontSize: "1rem" }}>
+        <div className="tip-section">
+          <h3 className="tip-title">
             {translations.addTipOptional || "Add Tip (Optional)"}
           </h3>
           
           {/* Quick Tip Buttons */}
-          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem", justifyContent: "center" }}>
+          <div className="tip-buttons">
             <button
               onClick={() => handleTipButton(15)}
-              style={{
-                padding: isExpanded ? "0.8rem 1.5rem" : "0.4rem 0.8rem",
-                fontSize: isExpanded ? "1.2rem" : "0.9rem",
-                minHeight: isExpanded ? "50px" : "auto",
-                background: tipAmount === "15" && tipType === "percent" ? "#2563eb" : "#f0f0f0",
-                color: tipAmount === "15" && tipType === "percent" ? "white" : "black",
-                border: "1px solid #ccc",
-                borderRadius: "5px",
-                cursor: "pointer",
-              }}
+              className={`tip-button ${tipAmount === "15" && tipType === "percent" ? "active" : ""}`}
             >
               15%
             </button>
             <button
               onClick={() => handleTipButton(18)}
-              style={{
-                padding: isExpanded ? "0.8rem 1.5rem" : "0.4rem 0.8rem",
-                fontSize: isExpanded ? "1.2rem" : "0.9rem",
-                minHeight: isExpanded ? "50px" : "auto",
-                background: tipAmount === "18" && tipType === "percent" ? "#2563eb" : "#f0f0f0",
-                color: tipAmount === "18" && tipType === "percent" ? "white" : "black",
-                border: "1px solid #ccc",
-                borderRadius: "5px",
-                cursor: "pointer",
-              }}
+              className={`tip-button ${tipAmount === "18" && tipType === "percent" ? "active" : ""}`}
             >
               18%
             </button>
             <button
               onClick={() => handleTipButton(20)}
-              style={{
-                padding: isExpanded ? "0.8rem 1.5rem" : "0.4rem 0.8rem",
-                fontSize: isExpanded ? "1.2rem" : "0.9rem",
-                minHeight: isExpanded ? "50px" : "auto",
-                background: tipAmount === "20" && tipType === "percent" ? "#2563eb" : "#f0f0f0",
-                color: tipAmount === "20" && tipType === "percent" ? "white" : "black",
-                border: "1px solid #ccc",
-                borderRadius: "5px",
-                cursor: "pointer",
-              }}
+              className={`tip-button ${tipAmount === "20" && tipType === "percent" ? "active" : ""}`}
             >
               20%
             </button>
             <button
               onClick={() => handleTipButton(25)}
-              style={{
-                padding: isExpanded ? "0.8rem 1.5rem" : "0.4rem 0.8rem",
-                fontSize: isExpanded ? "1.2rem" : "0.9rem",
-                minHeight: isExpanded ? "50px" : "auto",
-                background: tipAmount === "25" && tipType === "percent" ? "#2563eb" : "#f0f0f0",
-                color: tipAmount === "25" && tipType === "percent" ? "white" : "black",
-                border: "1px solid #ccc",
-                borderRadius: "5px",
-                cursor: "pointer",
-              }}
+              className={`tip-button ${tipAmount === "25" && tipType === "percent" ? "active" : ""}`}
             >
               25%
             </button>
           </div>
 
           {/* Custom Tip Input */}
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-            <div style={{ display: "flex", gap: "0.25rem", flex: 1 }}>
+          <div className="custom-tip-container">
+            <div className="tip-type-buttons">
               <button
                 onClick={() => {
                   setTipType("percent");
                   setTipAmount("");
                 }}
-                style={{
-                  padding: isExpanded ? "0.8rem 1rem" : "0.4rem 0.6rem",
-                  fontSize: isExpanded ? "1.1rem" : "0.85rem",
-                  minHeight: isExpanded ? "50px" : "auto",
-                  background: tipType === "percent" ? "#2563eb" : "#f0f0f0",
-                  color: tipType === "percent" ? "white" : "black",
-                  border: "1px solid #ccc",
-                  borderRadius: "5px 0 0 5px",
-                  cursor: "pointer",
-                }}
+                className={`tip-type-button ${tipType === "percent" ? "active" : ""}`}
               >
                 %
               </button>
@@ -302,16 +207,7 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
                   setTipType("dollar");
                   setTipAmount("");
                 }}
-                style={{
-                  padding: isExpanded ? "0.8rem 1rem" : "0.4rem 0.6rem",
-                  fontSize: isExpanded ? "1.1rem" : "0.85rem",
-                  minHeight: isExpanded ? "50px" : "auto",
-                  background: tipType === "dollar" ? "#2563eb" : "#f0f0f0",
-                  color: tipType === "dollar" ? "white" : "black",
-                  border: "1px solid #ccc",
-                  borderRadius: "0 5px 5px 0",
-                  cursor: "pointer",
-                }}
+                className={`tip-type-button ${tipType === "dollar" ? "active" : ""}`}
               >
                 $
               </button>
@@ -327,55 +223,31 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
                 setTipAmount(e.target.value);
                 setError("");
               }}
-              style={{
-                padding: isExpanded ? "1rem" : "0.5rem",
-                fontSize: isExpanded ? "1.2rem" : "1rem",
-                flex: 2,
-                border: "1px solid #ccc",
-                borderRadius: "5px",
-              }}
+              className="custom-tip-input"
             />
           </div>
           
           {tipAmount && (
-            <p style={{ marginTop: "0.5rem", fontSize: "0.9rem", color: "#666" }}>
+            <p className="tip-amount-display">
               {translations.tip || "Tip"}: ${calculateTip().toFixed(2)}
             </p>
           )}
         </div>
 
-        <div style={{ marginTop: "1rem" }}>
+        <div className="confirm-button-container">
           <button
             onClick={handleConfirm}
             disabled={!selectedMethod}
-            style={{
-              background: selectedMethod ? "#2563eb" : "#ccc",
-              color: "white",
-              padding: isExpanded ? "1.25rem 2rem" : "0.5rem 1rem",
-              fontSize: isExpanded ? "1.3rem" : "1rem",
-              minHeight: isExpanded ? "60px" : "auto",
-              border: "none",
-              borderRadius: "5px",
-              cursor: selectedMethod ? "pointer" : "not-allowed",
-              width: "100%",
-            }}
+            className="confirm-button"
           >
             {translations.confirmPayment || "Confirm Payment"}
           </button>
         </div>
 
-        <div style={{ marginTop: "0.5rem" }}>
+        <div className="cancel-button-container">
           <button
             onClick={onClose}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "#555",
-              cursor: "pointer",
-              padding: isExpanded ? "1rem 2rem" : "0.5rem 1rem",
-              fontSize: isExpanded ? "1.2rem" : "1rem",
-              minHeight: isExpanded ? "50px" : "auto",
-            }}
+            className="cancel-button"
           >
             {translations.cancel || "Cancel"}
           </button>

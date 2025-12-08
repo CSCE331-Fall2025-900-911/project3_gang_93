@@ -47,3 +47,35 @@
   gap: 0.75rem;
 }
 
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .order-panel {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .order-panel {
+    padding: 1.25rem;
+  }
+
+  .section-title {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .order-items {
+    min-height: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .order-panel {
+    padding: 1rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+  }
+}
+

@@ -26,6 +26,11 @@
   font-size: 1rem;
   font-weight: 500;
   color: #333;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+  text-align: center;
+  hyphens: auto;
 }
 
 .menu-item-price {

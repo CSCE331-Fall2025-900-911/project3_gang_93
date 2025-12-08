@@ -14,6 +14,9 @@
 .menu-management-header h2 {
   margin: 0;
   color: #333;
+  line-height: 1.3;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .menu-management-actions {
@@ -35,6 +38,11 @@
   cursor: pointer;
   font-size: 0.9rem;
   transition: all 0.2s;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  text-align: center;
+  line-height: 1.4;
 }
 
 .filter-btn:hover {
@@ -57,6 +65,11 @@
   font-size: 0.9rem;
   font-weight: 500;
   transition: background 0.2s;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  text-align: center;
+  line-height: 1.4;
 }
 
 .add-btn:hover {
@@ -276,5 +289,136 @@
 
 .delete-btn:hover {
   background: #dc2626;
+}
+
+/* Responsive Design */
+@media (max-width: 1400px) {
+  .menu-management {
+    max-width: 100%;
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .menu-management {
+    padding: 1.25rem;
+  }
+
+  .menu-management-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .menu-management-actions {
+    width: 100%;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .filter-buttons {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    flex: 1;
+    min-width: calc(33.333% - 0.334rem);
+  }
+
+  .menu-items-table {
+    overflow-x: auto;
+  }
+
+  .menu-items-table table {
+    min-width: 800px;
+  }
+}
+
+@media (max-width: 768px) {
+  .menu-management {
+    padding: 1rem;
+  }
+
+  .menu-management-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .filter-btn {
+    min-width: calc(50% - 0.25rem);
+    font-size: 0.85rem;
+    padding: 0.45rem 0.75rem;
+  }
+
+  .add-btn {
+    width: 100%;
+    padding: 0.6rem 1rem;
+  }
+
+  .menu-form-content {
+    width: 95%;
+    padding: 1.5rem;
+  }
+
+  .menu-items-table table {
+    min-width: 700px;
+    font-size: 0.9rem;
+  }
+
+  .menu-items-table th,
+  .menu-items-table td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .edit-btn,
+  .delete-btn {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    margin-right: 0.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .menu-management {
+    padding: 0.75rem;
+  }
+
+  .menu-management-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .filter-btn {
+    min-width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .menu-form-content {
+    width: 100%;
+    padding: 1rem;
+    max-height: 95vh;
+  }
+
+  .menu-items-table {
+    font-size: 0.85rem;
+  }
+
+  .menu-items-table th,
+  .menu-items-table td {
+    padding: 0.5rem 0.25rem;
+  }
+
+  .menu-items-table th {
+    font-size: 0.8rem;
+  }
+
+  .edit-btn,
+  .delete-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    display: block;
+    width: 100%;
+    margin-bottom: 0.25rem;
+    margin-right: 0;
+  }
 }
 

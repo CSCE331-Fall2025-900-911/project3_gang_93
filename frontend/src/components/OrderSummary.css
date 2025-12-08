@@ -28,3 +28,30 @@
   margin-top: 0.5rem;
 }
 
+/* Responsive Design */
+@media (max-width: 768px) {
+  .order-summary {
+    padding-top: 1.25rem;
+  }
+
+  .summary-row {
+    font-size: 0.9rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .total-row {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .summary-row {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .total-row {
+    font-size: 1rem;
+  }
+}
+
