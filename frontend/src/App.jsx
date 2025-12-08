@@ -451,6 +451,7 @@ function App() {
         <OrderPanel
           cart={cart}
           onRemoveItem={removeFromCart}
+          onAddItem={addToCart}
           onCompleteTransaction={completeTransaction}
         />
       </main>

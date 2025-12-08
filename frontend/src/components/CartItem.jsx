@@ -1,6 +1,6 @@
 import './CartItem.css'
 
-function CartItem({ item, onRemove, cartKey }) {
+function CartItem({ item, onRemove, onAddItem, cartKey }) {
   const totalPrice = item.price * item.quantity;
 
   // Format customizations for display
@@ -26,9 +26,6 @@ function CartItem({ item, onRemove, cartKey }) {
             ))}
           </div>
         )}
-        {item.quantity > 1 && (
-          <span className="cart-item-quantity">Qty: {item.quantity}</span>
-        )}
       </div>
       <div className="cart-item-right">
         <span className="cart-item-price">
@@ -39,13 +36,37 @@ function CartItem({ item, onRemove, cartKey }) {
           )}
           ${totalPrice.toFixed(2)}
         </span>
-        <button 
-          className="remove-button"
-          onClick={() => onRemove(cartKey || item.id)}
-          aria-label={`Remove one ${item.name} from cart`}
-        >
-          ×
-        </button>
+        <div className="cart-item-quantity-controls">
+          <button
+            className="cart-item-quantity-button"
+            onClick={() => onRemove(cartKey || item.id)}
+            aria-label={`Decrease quantity of ${item.name}`}
+          >
+            −
+          </button>
+          <span className="cart-item-quantity-display">{item.quantity}</span>
+          {onAddItem && (
+            <button
+              className="cart-item-quantity-button"
+              onClick={() => {
+                // Reconstruct the item with all its customizations to add another
+                const itemToAdd = {
+                  id: item.id || item.menuItemId,
+                  menuItemId: item.menuItemId || item.id,
+                  name: item.name,
+                  price: item.price,
+                  addOnIDs: item.addOnIDs || [],
+                  ice: item.ice || "normal",
+                  sweetness: item.sweetness || "100%",
+                };
+                onAddItem(itemToAdd);
+              }}
+              aria-label={`Increase quantity of ${item.name}`}
+            >
+              +
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

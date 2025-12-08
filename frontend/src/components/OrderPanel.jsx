@@ -4,7 +4,7 @@ import CompleteButton from './CompleteButton'
 import { TAX_RATE } from '../constants/menuItems'
 import './OrderPanel.css'
 
-function OrderPanel({ cart, onRemoveItem, onCompleteTransaction }) {
+function OrderPanel({ cart, onRemoveItem, onAddItem, onCompleteTransaction }) {
   const cartItems = Object.values(cart);
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const tax = subtotal * TAX_RATE;
@@ -29,6 +29,7 @@ function OrderPanel({ cart, onRemoveItem, onCompleteTransaction }) {
                   item={item} 
                   cartKey={cartKey}
                   onRemove={onRemoveItem}
+                  onAddItem={onAddItem}
                 />
               ))}
             </div>
