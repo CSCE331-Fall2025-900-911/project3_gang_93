@@ -37,61 +37,6 @@ app.add_middleware(
 def root():
     return {"message": "POS System API", "version": "1.0.0"}
 
-# ================== AUTH HELPERS ==================
-
-def verify_manager_auth(
-    x_employee_id: Optional[str] = Header(None, alias="X-Employee-Id"),
-    x_auth_level: Optional[str] = Header(None, alias="X-Auth-Level")
-):
-    """
-    Verify that the request comes from an authenticated manager.
-    Checks X-Employee-Id and X-Auth-Level headers and validates against database.
-    """
-    # Check if headers are provided
-    if not x_employee_id or not x_auth_level:
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication required. Please provide X-Employee-Id and X-Auth-Level headers."
-        )
-    
-    try:
-        employee_id = int(x_employee_id)
-    except ValueError:
-        raise HTTPException(status_code=401, detail="Invalid employee ID format")
-    
-    # Verify employee exists and has Manager role
-    try:
-        query = """
-            SELECT employeeId, firstName, lastName, authLevel
-            FROM employees
-            WHERE employeeId = %s
-        """
-        employee = execute_query(query, (employee_id,), fetch_one=True)
-        
-        if not employee:
-            raise HTTPException(status_code=401, detail="Employee not found")
-        
-        # Check if the employee's actual auth level matches the header
-        if employee['authlevel'] != x_auth_level:
-            raise HTTPException(
-                status_code=403,
-                detail="Authorization level mismatch"
-            )
-        
-        # Check if the employee is a Manager
-        if employee['authlevel'] != 'Manager':
-            raise HTTPException(
-                status_code=403,
-                detail="Manager access required. Only managers can perform this action."
-            )
-        
-        return employee
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Authentication error: {str(e)}")
-
 # ================== MENU APIs ==================
 
 @app.get("/api/menu", response_model=MenuResponse)
@@ -147,8 +92,8 @@ def get_menu_item(menu_item_id: int):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.post("/api/menu", response_model=MenuItem)
-def create_menu_item(item: MenuItemCreate, auth: dict = Depends(verify_manager_auth)):
-    """Create a new menu item (Manager only)"""
+def create_menu_item(item: MenuItemCreate):
+    """Create a new menu item"""
     try:
         # Get the next available menuItemId
         query_max_id = "SELECT COALESCE(MAX(menuItemId), 100) as max_id FROM menu"
@@ -180,8 +125,8 @@ def create_menu_item(item: MenuItemCreate, auth: dict = Depends(verify_manager_a
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.put("/api/menu/{menu_item_id}", response_model=MenuItem)
-def update_menu_item(menu_item_id: int, item: MenuItemUpdate, auth: dict = Depends(verify_manager_auth)):
-    """Update an existing menu item (Manager only)"""
+def update_menu_item(menu_item_id: int, item: MenuItemUpdate):
+    """Update an existing menu item"""
     try:
         # Check if the menu item exists
         check_query = "SELECT menuItemId FROM menu WHERE menuItemId = %s"
@@ -243,8 +188,8 @@ def update_menu_item(menu_item_id: int, item: MenuItemUpdate, auth: dict = Depen
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.delete("/api/menu/{menu_item_id}")
-def delete_menu_item(menu_item_id: int, auth: dict = Depends(verify_manager_auth)):
-    """Delete a menu item (Manager only)"""
+def delete_menu_item(menu_item_id: int):
+    """Delete a menu item"""
     try:
         # Check if the menu item exists
         check_query = "SELECT menuItemId FROM menu WHERE menuItemId = %s"
