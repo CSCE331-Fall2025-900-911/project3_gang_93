@@ -1954,6 +1954,7 @@ def translate_text(request: TranslateRequest):
 
     body = {
         "q": request.text,
+        "source": "en",  # Explicitly specify English as source language
         "target": request.target_language,
         "format": "text"
     }

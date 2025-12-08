@@ -29,6 +29,7 @@ function App() {
   const [employee, setEmployee] = useState(null);
   const [showEmployeeLogin, setShowEmployeeLogin] = useState(false);
   const [showManagerLogin, setShowManagerLogin] = useState(false);
+  const [kioskLanguage, setKioskLanguage] = useState("en");
 
   // Check for existing kiosk user session and OAuth callback on mount
   useEffect(() => {
@@ -402,6 +403,7 @@ function App() {
           onLogout={handleKioskLogout}
           isExpanded={isKioskExpanded}
           onToggleExpanded={() => setIsKioskExpanded(!isKioskExpanded)}
+          onLanguageChange={setKioskLanguage}
         />
         <DrinkCustomizationModal
           item={selectedItem}
@@ -412,6 +414,7 @@ function App() {
           }}
           onAddToCart={addToCart}
           isExpanded={isKioskExpanded}
+          language={kioskLanguage}
         />
         <PaymentSelector
           open={popupOpen}
@@ -422,6 +425,7 @@ function App() {
             0
           )}
           isExpanded={isKioskExpanded}
+          language={kioskLanguage}
         />
         <AlertModal
           message={alertMessage}
@@ -458,6 +462,7 @@ function App() {
           setSelectedItem(null);
         }}
         onAddToCart={addToCart}
+        language="en"
       />
       <PaymentSelector
         open={popupOpen}

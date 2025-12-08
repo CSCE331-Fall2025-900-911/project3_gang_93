@@ -338,16 +338,23 @@ export const weatherAPI = {
 /**
  * Translate API
  */
-export const translateAPI = async (text, target_lang) => {
-  const result = await apiRequest("/api/translate", {
-    method: "POST",
-    body: JSON.stringify({
-      text,
-      target_language: target_lang,
-    }),
-  });
-
-  return result.translated_text;
+export const translateAPI = {
+  translate: async (text, targetLanguage) => {
+    try {
+      const result = await apiRequest("/api/translate", {
+        method: "POST",
+        body: JSON.stringify({
+          text: text,
+          target_language: targetLanguage,
+        }),
+      });
+      return result.translated_text;
+    } catch (error) {
+      console.error("Translation error:", error);
+      // Return original text if translation fails
+      return text;
+    }
+  },
 };
 
 /**
@@ -393,5 +400,6 @@ export default {
   employeeAPI,
   authAPI,
   weatherAPI,
+  translateAPI,
   testConnection,
 };

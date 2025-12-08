@@ -1,11 +1,29 @@
 import React, { useState, useEffect } from "react";
+import { translate, translateBatch } from "../utils/translation";
 
-export default function PaymentSelector({ open, onClose, onSelect, subtotal, isExpanded = false }) {
+// UI text keys (defined outside component to avoid dependency issues)
+const UI_TEXT_KEYS = {
+  selectPaymentMethod: "Select Payment Method",
+  card: "Card",
+  cash: "Cash",
+  enterCashGiven: "Enter cash given",
+  addTipOptional: "Add Tip (Optional)",
+  customPercent: "Custom %",
+  customAmount: "Custom amount",
+  tip: "Tip",
+  confirmPayment: "Confirm Payment",
+  cancel: "Cancel",
+  pleaseSelectPaymentMethod: "Please select a payment method.",
+  pleaseEnterValidCashAmount: "Please enter a valid cash amount.",
+};
+
+export default function PaymentSelector({ open, onClose, onSelect, subtotal, isExpanded = false, language = "en" }) {
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [cashAmount, setCashAmount] = useState("");
   const [tipAmount, setTipAmount] = useState("");
   const [tipType, setTipType] = useState("percent"); // "percent" or "dollar"
   const [error, setError] = useState("");
+  const [translations, setTranslations] = useState({});
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -17,6 +35,47 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
       setError("");
     }
   }, [open]);
+
+  // Translate UI text when language changes or modal opens
+  useEffect(() => {
+    const translateUIText = async () => {
+      // Initialize with English first
+      const englishTranslations = {};
+      Object.keys(UI_TEXT_KEYS).forEach(key => {
+        englishTranslations[key] = UI_TEXT_KEYS[key];
+      });
+      
+      if (language === "en") {
+        setTranslations(englishTranslations);
+        return;
+      }
+
+      if (!open) {
+        setTranslations(englishTranslations);
+        return;
+      }
+
+      try {
+        console.log("[PaymentSelector] Translating UI text to", language);
+        const textsToTranslate = Object.values(UI_TEXT_KEYS);
+        const translatedTexts = await Promise.all(
+          textsToTranslate.map(text => translate(text, language, true))
+        );
+        console.log("[PaymentSelector] Translated texts:", translatedTexts);
+        
+        const newTranslations = {};
+        Object.keys(UI_TEXT_KEYS).forEach((key, index) => {
+          newTranslations[key] = translatedTexts[index];
+        });
+        setTranslations(newTranslations);
+      } catch (error) {
+        console.error("[PaymentSelector] Failed to translate:", error);
+        setTranslations(englishTranslations);
+      }
+    };
+
+    translateUIText();
+  }, [language, open]);
 
   if (!open) return null;
 
@@ -39,14 +98,14 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
 
   const handleConfirm = () => {
     if (!selectedMethod) {
-      setError("Please select a payment method.");
+      setError(translations.pleaseSelectPaymentMethod || "Please select a payment method.");
       return;
     }
 
     if (selectedMethod === "Cash") {
       const value = parseFloat(cashAmount);
       if (isNaN(value) || value <= 0) {
-        setError("Please enter a valid cash amount.");
+        setError(translations.pleaseEnterValidCashAmount || "Please enter a valid cash amount.");
         return;
       }
     }
@@ -83,7 +142,9 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
           overflowY: "auto",
         }}
       >
-        <h2 style={{ fontSize: isExpanded ? "2rem" : "1.5rem" }}>Select Payment Method</h2>
+        <h2 style={{ fontSize: isExpanded ? "2rem" : "1.5rem" }}>
+          {translations.selectPaymentMethod || "Select Payment Method"}
+        </h2>
 
         <div style={{ marginTop: "1rem" }}>
           <button
@@ -101,7 +162,7 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
               cursor: "pointer",
             }}
           >
-            💳 Card
+            💳 {translations.card || "Card"}
           </button>
           <button
             onClick={() => setSelectedMethod("Cash")}
@@ -117,7 +178,7 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
               cursor: "pointer",
             }}
           >
-            💵 Cash
+            💵 {translations.cash || "Cash"}
           </button>
         </div>
 
@@ -126,7 +187,7 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
             <input
               type="number"
               step="0.01"
-              placeholder="Enter cash given"
+              placeholder={translations.enterCashGiven || "Enter cash given"}
               value={cashAmount}
               onChange={(e) => {
                 setCashAmount(e.target.value);
@@ -147,7 +208,9 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
 
         {/* Tip Section */}
         <div style={{ marginTop: "1.5rem", borderTop: "1px solid #eee", paddingTop: "1rem" }}>
-          <h3 style={{ margin: "0 0 0.75rem 0", fontSize: "1rem" }}>Add Tip (Optional)</h3>
+          <h3 style={{ margin: "0 0 0.75rem 0", fontSize: "1rem" }}>
+            {translations.addTipOptional || "Add Tip (Optional)"}
+          </h3>
           
           {/* Quick Tip Buttons */}
           <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem", justifyContent: "center" }}>
@@ -256,7 +319,9 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
             <input
               type="number"
               step="0.01"
-              placeholder={tipType === "percent" ? "Custom %" : "Custom amount"}
+              placeholder={tipType === "percent" 
+                ? (translations.customPercent || "Custom %")
+                : (translations.customAmount || "Custom amount")}
               value={tipAmount}
               onChange={(e) => {
                 setTipAmount(e.target.value);
@@ -274,7 +339,7 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
           
           {tipAmount && (
             <p style={{ marginTop: "0.5rem", fontSize: "0.9rem", color: "#666" }}>
-              Tip: ${calculateTip().toFixed(2)}
+              {translations.tip || "Tip"}: ${calculateTip().toFixed(2)}
             </p>
           )}
         </div>
@@ -295,7 +360,7 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
               width: "100%",
             }}
           >
-            Confirm Payment
+            {translations.confirmPayment || "Confirm Payment"}
           </button>
         </div>
 
@@ -312,7 +377,7 @@ export default function PaymentSelector({ open, onClose, onSelect, subtotal, isE
               minHeight: isExpanded ? "50px" : "auto",
             }}
           >
-            Cancel
+            {translations.cancel || "Cancel"}
           </button>
         </div>
       </div>

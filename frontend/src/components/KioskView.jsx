@@ -1,18 +1,155 @@
 import { useState, useRef, useEffect } from "react";
 import WeatherWidget from "./WeatherWidget";
+import { translate, translateBatch, clearTranslationCache } from "../utils/translation";
 import "./KioskView.css";
 
-function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, onSwitchToCashier, user, onLoginClick, onLogout, isExpanded, onToggleExpanded }) {
+function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, onSwitchToCashier, user, onLoginClick, onLogout, isExpanded, onToggleExpanded, onLanguageChange }) {
   const [filter, setFilter] = useState("all");
   const [currentStep, setCurrentStep] = useState("menu"); // "menu" or "cart"
   const [language, setLanguage] = useState("en"); // "en" or "es"
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const languageDropdownRef = useRef(null);
+  const [translations, setTranslations] = useState({});
+  const [translating, setTranslating] = useState(false);
 
   const languages = {
     en: "English",
     es: "Español"
   };
+
+  // UI text keys that need translation
+  const uiTextKeys = {
+    orderHere: "Order Here",
+    currentOrder: "Current Order",
+    addMoreItems: "Add More Items",
+    subtotal: "Subtotal",
+    tax: "Tax",
+    total: "Total",
+    checkout: "Checkout",
+    all: "All",
+    coffee: "Coffee",
+    tea: "Tea",
+    customize: "+ Customize",
+    noItemsFound: "No items found in this category.",
+    signIn: "Sign In",
+    logout: "Logout",
+    item: "item",
+    items: "items"
+  };
+
+  // Notify parent component of language changes
+  useEffect(() => {
+    if (onLanguageChange) {
+      onLanguageChange(language);
+    }
+  }, [language, onLanguageChange]);
+
+  // Clear translation cache when language changes to ensure fresh translations
+  useEffect(() => {
+    clearTranslationCache();
+  }, [language]);
+
+  // Translate UI text when language changes
+  useEffect(() => {
+    const translateUIText = async () => {
+      if (language === "en") {
+        // Reset to English
+        const englishTranslations = {};
+        Object.keys(uiTextKeys).forEach(key => {
+          englishTranslations[key] = uiTextKeys[key];
+        });
+        setTranslations(englishTranslations);
+        return;
+      }
+
+      setTranslating(true);
+      try {
+        const textsToTranslate = Object.values(uiTextKeys);
+        const translatedTexts = await translateBatch(textsToTranslate, language);
+        
+        const newTranslations = {};
+        Object.keys(uiTextKeys).forEach((key, index) => {
+          newTranslations[key] = translatedTexts[index];
+        });
+        
+        setTranslations(newTranslations);
+      } catch (error) {
+        console.error("Failed to translate UI text:", error);
+        // Fallback to English
+        const englishTranslations = {};
+        Object.keys(uiTextKeys).forEach(key => {
+          englishTranslations[key] = uiTextKeys[key];
+        });
+        setTranslations(englishTranslations);
+      } finally {
+        setTranslating(false);
+      }
+    };
+
+    translateUIText();
+  }, [language]);
+
+  const [translatedMenuItems, setTranslatedMenuItems] = useState(menuItems);
+  const [translatedCart, setTranslatedCart] = useState(cart);
+
+  // Translate menu item names when language or menuItems change
+  useEffect(() => {
+    const updateTranslatedMenuItems = async () => {
+      if (language === "en") {
+        setTranslatedMenuItems(menuItems);
+        return;
+      }
+
+      setTranslating(true);
+      try {
+        const translatedItems = await Promise.all(
+          menuItems.map(async (item) => {
+            const translatedName = await translate(item.name, language);
+            // Log if translation didn't change (might be a proper noun)
+            if (translatedName === item.name && language !== "en") {
+              console.log(`[Translation] "${item.name}" was not translated (may be a proper noun)`);
+            }
+            return { ...item, translatedName };
+          })
+        );
+        setTranslatedMenuItems(translatedItems);
+      } catch (error) {
+        console.error("Failed to translate menu items:", error);
+        setTranslatedMenuItems(menuItems);
+      } finally {
+        setTranslating(false);
+      }
+    };
+
+    updateTranslatedMenuItems();
+  }, [language, menuItems]);
+
+  // Translate cart item names when language or cart changes
+  useEffect(() => {
+    const updateTranslatedCart = async () => {
+      if (language === "en") {
+        setTranslatedCart(cart);
+        return;
+      }
+
+      try {
+        console.log("[KioskView] Translating cart items to", language);
+        const translatedCartObj = {};
+        for (const [key, item] of Object.entries(cart)) {
+          // Force fresh translation by bypassing cache
+          const translatedName = await translate(item.name, language, true);
+          console.log(`[KioskView] Translated cart item: "${item.name}" -> "${translatedName}"`);
+          translatedCartObj[key] = { ...item, translatedName };
+        }
+        setTranslatedCart(translatedCartObj);
+      } catch (error) {
+        console.error("[KioskView] Failed to translate cart items:", error);
+        setTranslatedCart(cart);
+      }
+    };
+
+    updateTranslatedCart();
+  }, [language, cart]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -30,18 +167,24 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
     };
   }, [showLanguageDropdown]);
 
-  const cartItems = Object.values(cart);
+  const cartItems = Object.values(translatedCart);
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const tax = subtotal * 0.0825;
   const total = subtotal + tax;
 
   const filteredItems = filter === "all" 
-    ? menuItems 
-    : menuItems.filter(item => {
-        const name = item.name.toLowerCase();
-        if (filter === "coffee") return name.includes("coffee") || name.includes("latte");
-        if (filter === "tea") return name.includes("tea");
+    ? translatedMenuItems 
+    : translatedMenuItems.filter(item => {
+        const name = (item.translatedName || item.name).toLowerCase();
+        const originalName = item.name.toLowerCase();
+        if (filter === "coffee") {
+          return name.includes("café") || name.includes("coffee") || name.includes("latte") || 
+                 originalName.includes("coffee") || originalName.includes("latte");
+        }
+        if (filter === "tea") {
+          return name.includes("té") || name.includes("tea") || originalName.includes("tea");
+        }
         return true;
       });
 
@@ -53,9 +196,9 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <h2>
                 <span className="cart-icon">🛒</span>
-                Current Order
+                {translations.currentOrder || "Current Order"}
               </h2>
-              <WeatherWidget city="College Station" />
+              <WeatherWidget city="College Station" language={language} />
               <div className="kiosk-language-selector" ref={languageDropdownRef}>
                 <button 
                   className="kiosk-translate-button"
@@ -98,15 +241,15 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
               className="kiosk-back-button"
               onClick={() => setCurrentStep("menu")}
             >
-              ← Add More Items
+              ← {translations.addMoreItems || "Add More Items"}
             </button>
           </div>
 
           <div className="kiosk-cart-items">
-            {Object.entries(cart).map(([cartKey, item]) => (
+            {Object.entries(translatedCart).map(([cartKey, item]) => (
               <div key={cartKey} className="kiosk-cart-item">
                 <div className="kiosk-cart-item-info">
-                  <span className="kiosk-cart-item-name">{item.name}</span>
+                  <span className="kiosk-cart-item-name">{item.translatedName || item.name}</span>
                   <span className="kiosk-cart-item-price">
                     ${(item.price * item.quantity).toFixed(2)}
                   </span>
@@ -132,15 +275,15 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
 
           <div className="kiosk-order-summary">
             <div className="kiosk-summary-row">
-              <span>Subtotal:</span>
+              <span>{translations.subtotal || "Subtotal"}:</span>
               <span>${subtotal.toFixed(2)}</span>
             </div>
             <div className="kiosk-summary-row">
-              <span>Tax:</span>
+              <span>{translations.tax || "Tax"}:</span>
               <span>${tax.toFixed(2)}</span>
             </div>
             <div className="kiosk-summary-row kiosk-total-row">
-              <span>Total:</span>
+              <span>{translations.total || "Total"}:</span>
               <span>${total.toFixed(2)}</span>
             </div>
           </div>
@@ -148,8 +291,9 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
           <button
             className="kiosk-checkout-button"
             onClick={onCompleteTransaction}
+            disabled={translating}
           >
-            Checkout
+            {translating ? "..." : (translations.checkout || "Checkout")}
           </button>
         </div>
       </div>
@@ -160,7 +304,7 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
     <div className={`kiosk-view ${isExpanded ? 'kiosk-view-expanded' : ''}`}>
       <div className="kiosk-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
-          <h1 className="kiosk-title">Order Here</h1>
+          <h1 className="kiosk-title">{translations.orderHere || "Order Here"}</h1>
           {user && (
             <div className="kiosk-user-info">
               <span className="kiosk-user-name">{user.name || user.email}</span>
@@ -168,7 +312,7 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <WeatherWidget city="College Station" />
+          <WeatherWidget city="College Station" language={language} />
           <div className="kiosk-language-selector" ref={languageDropdownRef}>
             <button 
               className="kiosk-translate-button"
@@ -211,7 +355,7 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
               className="kiosk-cart-badge"
               onClick={() => setCurrentStep("cart")}
             >
-              🛒 {totalItems} item{totalItems !== 1 ? 's' : ''} • ${subtotal.toFixed(2)}
+              🛒 {totalItems} {totalItems !== 1 ? (translations.items || "items") : (translations.item || "item")} • ${subtotal.toFixed(2)}
             </button>
           )}
           {!user && onLoginClick && (
@@ -220,7 +364,7 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
               onClick={onLoginClick}
               title="Sign in with Google"
             >
-              Sign In
+              {translations.signIn || "Sign In"}
             </button>
           )}
           {user && onLogout && (
@@ -229,7 +373,7 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
               onClick={onLogout}
               title="Logout"
             >
-              Logout
+              {translations.logout || "Logout"}
             </button>
           )}
           <button
@@ -247,19 +391,19 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
           className={`kiosk-filter-button ${filter === "all" ? "active" : ""}`}
           onClick={() => setFilter("all")}
         >
-          All
+          {translations.all || "All"}
         </button>
         <button
           className={`kiosk-filter-button ${filter === "coffee" ? "active" : ""}`}
           onClick={() => setFilter("coffee")}
         >
-          Coffee
+          {translations.coffee || "Coffee"}
         </button>
         <button
           className={`kiosk-filter-button ${filter === "tea" ? "active" : ""}`}
           onClick={() => setFilter("tea")}
         >
-          Tea
+          {translations.tea || "Tea"}
         </button>
       </div>
 
@@ -271,16 +415,16 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
             onClick={() => onItemClick(item)}
           >
             <div className="kiosk-menu-item-icon">{item.icon}</div>
-            <div className="kiosk-menu-item-name">{item.name}</div>
+            <div className="kiosk-menu-item-name">{item.translatedName || item.name}</div>
             <div className="kiosk-menu-item-price">${item.price.toFixed(2)}</div>
-            <div className="kiosk-menu-item-add">+ Customize</div>
+            <div className="kiosk-menu-item-add">{translations.customize || "+ Customize"}</div>
           </div>
         ))}
       </div>
 
       {filteredItems.length === 0 && (
         <div className="kiosk-empty-state">
-          <p>No items found in this category.</p>
+          <p>{translations.noItemsFound || "No items found in this category."}</p>
         </div>
       )}
     </div>
