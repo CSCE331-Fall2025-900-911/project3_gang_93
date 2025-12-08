@@ -1,11 +1,12 @@
 """FastAPI application for POS System"""
-from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Header, Depends
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
 from google.auth.transport import requests as gauth_requests
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
-from typing import Optional
-from datetime import datetime
 from google.oauth2 import id_token
+from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional
 import urllib.parse
 import requests
 import json
@@ -32,6 +33,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Google translate for frontend
+# Get translate key from environment variable
+GOOGLE_TRANSLATE_KEY = os.getenv("GOOGLE_TRANSLATE_KEY")
+
+# Translate model class for requests
+class TranslateRequest(BaseModel):
+    text: str
+    target_language: str # e.g., 'es' for Spanish or 'en' for English
 
 @app.get("/")
 def root():
@@ -1934,7 +1944,31 @@ def get_weather(city: str = "College Station"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Weather API error: {str(e)}")
 
+@app.post("/api/translate")
+def translate_text(request: TranslateRequest):
+    """Translate text to a target language using Google Cloud Translation API."""
+    if not GOOGLE_TRANSLATE_KEY:
+        raise HTTPException(status_code=500, detail="Translation service not configured")
+    
+    translate_url = f"https://translation.googleapis.com/language/translate/v2?key={GOOGLE_TRANSLATE_KEY}"
+
+    body = {
+        "q": request.text,
+        "target": request.target_language,
+        "format": "text"
+    }
+
+    try:        
+        response = requests.post(translate_url, json=body)
+        result = response.json()
+
+        translated_text = result["data"]["translations"][0]["translatedText"]        
+        return {"translated_text": translated_text}
+        
+    except Exception as e:
+        print(f"[Translate] Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Translation API error: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

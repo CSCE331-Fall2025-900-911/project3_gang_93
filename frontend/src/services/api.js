@@ -336,6 +336,21 @@ export const weatherAPI = {
 };
 
 /**
+ * Translate API
+ */
+export const translateAPI = async (text, target_lang) => {
+  const result = await apiRequest("/api/translate", {
+    method: "POST",
+    body: JSON.stringify({
+      text,
+      target_language: target_lang,
+    }),
+  });
+
+  return result.translated_text;
+};
+
+/**
  * Customer API - Extended
  */
 export const customerAPIExtended = {
