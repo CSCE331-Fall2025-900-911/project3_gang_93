@@ -107,7 +107,9 @@ function App() {
     // Create a unique key based on item ID and customizations
     const customizationKey = JSON.stringify({
       addOnIDs: (customizedItem.addOnIDs || []).sort(),
+      temperature: customizedItem.temperature || "cold",
       ice: customizedItem.ice || "normal",
+      size: customizedItem.size || "regular",
       sweetness: customizedItem.sweetness || "100%",
     });
     const cartKey = `${customizedItem.id}_${customizationKey}`;

@@ -5,8 +5,17 @@ function CartItem({ item, onRemove, onAddItem, cartKey }) {
 
   // Format customizations for display
   const customizations = [];
+  if (item.temperature && item.temperature !== "cold") {
+    customizations.push(`${item.temperature.charAt(0).toUpperCase() + item.temperature.slice(1)}`);
+  }
+  if (item.size && item.size !== "regular") {
+    customizations.push(`${item.size.charAt(0).toUpperCase() + item.size.slice(1)}`);
+  }
   if (item.ice && item.ice !== "normal") {
-    customizations.push(`Ice: ${item.ice}`);
+    const iceLabel = item.ice === "no" ? "No Ice" : 
+                     item.ice === "light" ? "Light Ice" :
+                     item.ice === "extra" ? "Extra Ice" : "Normal Ice";
+    customizations.push(iceLabel);
   }
   if (item.sweetness && item.sweetness !== "100%") {
     customizations.push(`Sweet: ${item.sweetness}`);
@@ -56,7 +65,9 @@ function CartItem({ item, onRemove, onAddItem, cartKey }) {
                   name: item.name,
                   price: item.price,
                   addOnIDs: item.addOnIDs || [],
+                  temperature: item.temperature || "cold",
                   ice: item.ice || "normal",
+                  size: item.size || "regular",
                   sweetness: item.sweetness || "100%",
                 };
                 onAddItem(itemToAdd);

@@ -3,10 +3,22 @@ import { addOnsAPI } from "../services/api";
 import { translate, translateBatch, clearTranslationCache } from "../utils/translation";
 import "./DrinkCustomizationModal.css";
 
+const TEMPERATURE_OPTIONS = [
+  { value: "cold", label: "Cold" },
+  { value: "hot", label: "Hot" },
+];
+
 const ICE_OPTIONS = [
+  { value: "no", label: "No Ice" },
   { value: "light", label: "Light Ice" },
   { value: "normal", label: "Normal Ice" },
   { value: "extra", label: "Extra Ice" },
+];
+
+const SIZE_OPTIONS = [
+  { value: "small", label: "Small", priceAdjustment: -1.0 },
+  { value: "regular", label: "Regular", priceAdjustment: 0.0 },
+  { value: "large", label: "Large", priceAdjustment: 1.0 },
 ];
 
 const SWEETNESS_OPTIONS = [
@@ -15,13 +27,16 @@ const SWEETNESS_OPTIONS = [
   { value: "50%", label: "50% (Half Sweet)" },
   { value: "75%", label: "75% (Regular)" },
   { value: "100%", label: "100% (Full Sweet)" },
+  { value: "125%", label: "125% (Extra Sweetness)" },
 ];
 
 // UI text keys (defined outside component to avoid dependency issues)
 const UI_TEXT_KEYS = {
   customizeYourDrink: "Customize Your Drink",
   base: "Base",
+  temperature: "Temperature",
   iceLevel: "Ice Level",
+  size: "Size",
   sweetnessLevel: "Sweetness Level",
   addOnsOptional: "Add-Ons (Optional)",
   loadingAddOns: "Loading add-ons...",
@@ -34,12 +49,16 @@ const UI_TEXT_KEYS = {
 function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpanded = false, language = "en" }) {
   const [addOns, setAddOns] = useState([]);
   const [selectedAddOns, setSelectedAddOns] = useState([]);
+  const [temperature, setTemperature] = useState("cold");
   const [iceLevel, setIceLevel] = useState("normal");
+  const [size, setSize] = useState("regular");
   const [sweetnessLevel, setSweetnessLevel] = useState("100%");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [translations, setTranslations] = useState({});
+  const [translatedTemperatureOptions, setTranslatedTemperatureOptions] = useState(TEMPERATURE_OPTIONS);
   const [translatedIceOptions, setTranslatedIceOptions] = useState(ICE_OPTIONS);
+  const [translatedSizeOptions, setTranslatedSizeOptions] = useState(SIZE_OPTIONS);
   const [translatedSweetnessOptions, setTranslatedSweetnessOptions] = useState(SWEETNESS_OPTIONS);
   const [translatedAddOns, setTranslatedAddOns] = useState([]);
   const [itemTranslatedName, setItemTranslatedName] = useState(null);
@@ -65,7 +84,9 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
       
       if (language === "en") {
         setTranslations(englishTranslations);
+        setTranslatedTemperatureOptions(TEMPERATURE_OPTIONS);
         setTranslatedIceOptions(ICE_OPTIONS);
+        setTranslatedSizeOptions(SIZE_OPTIONS);
         setTranslatedSweetnessOptions(SWEETNESS_OPTIONS);
         return;
       }
@@ -73,7 +94,9 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
       if (!isOpen) {
         // Still set English translations if modal is closed
         setTranslations(englishTranslations);
+        setTranslatedTemperatureOptions(TEMPERATURE_OPTIONS);
         setTranslatedIceOptions(ICE_OPTIONS);
+        setTranslatedSizeOptions(SIZE_OPTIONS);
         setTranslatedSweetnessOptions(SWEETNESS_OPTIONS);
         return;
       }
@@ -103,6 +126,17 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
         console.log("[DrinkCustomizationModal] Final translations object:", newTranslations);
         setTranslations(newTranslations);
 
+        // Translate temperature options
+        console.log("[DrinkCustomizationModal] Translating temperature options");
+        const temperatureLabels = TEMPERATURE_OPTIONS.map(opt => opt.label);
+        const translatedTemperatureLabels = await Promise.all(
+          temperatureLabels.map(label => translate(label, language, true))
+        );
+        setTranslatedTemperatureOptions(TEMPERATURE_OPTIONS.map((opt, idx) => ({
+          ...opt,
+          label: translatedTemperatureLabels[idx]
+        })));
+
         // Translate ice options
         console.log("[DrinkCustomizationModal] Translating ice options");
         const iceLabels = ICE_OPTIONS.map(opt => opt.label);
@@ -113,6 +147,17 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
         setTranslatedIceOptions(ICE_OPTIONS.map((opt, idx) => ({
           ...opt,
           label: translatedIceLabels[idx]
+        })));
+
+        // Translate size options
+        console.log("[DrinkCustomizationModal] Translating size options");
+        const sizeLabels = SIZE_OPTIONS.map(opt => opt.label);
+        const translatedSizeLabels = await Promise.all(
+          sizeLabels.map(label => translate(label, language, true))
+        );
+        setTranslatedSizeOptions(SIZE_OPTIONS.map((opt, idx) => ({
+          ...opt,
+          label: translatedSizeLabels[idx]
         })));
 
         // Translate sweetness options
@@ -130,7 +175,9 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
       } catch (error) {
         console.error("[DrinkCustomizationModal] Failed to translate:", error);
         setTranslations(englishTranslations);
+        setTranslatedTemperatureOptions(TEMPERATURE_OPTIONS);
         setTranslatedIceOptions(ICE_OPTIONS);
+        setTranslatedSizeOptions(SIZE_OPTIONS);
         setTranslatedSweetnessOptions(SWEETNESS_OPTIONS);
       }
     };
@@ -212,7 +259,9 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
       fetchAddOns();
       // Reset selections when modal opens
       setSelectedAddOns([]);
+      setTemperature("cold");
       setIceLevel("normal");
+      setSize("regular");
       setSweetnessLevel("100%");
     }
   }, [isOpen]);
@@ -241,17 +290,29 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
 
   const calculateTotal = () => {
     let total = item.price;
+    
+    // Add size adjustment
+    const selectedSize = SIZE_OPTIONS.find(s => s.value === size);
+    if (selectedSize) {
+      total += selectedSize.priceAdjustment;
+    }
+    
+    // Add add-ons
     selectedAddOns.forEach((addOnId) => {
       const addOn = addOns.find((a) => a.id === addOnId);
       if (addOn) {
         total += addOn.price;
       }
     });
+    
     return total;
   };
 
   const handleAddToCart = () => {
-    // Calculate the total price including add-ons
+    // Calculate the total price including size adjustment and add-ons
+    const selectedSize = SIZE_OPTIONS.find(s => s.value === size);
+    const sizeAdjustment = selectedSize ? selectedSize.priceAdjustment : 0;
+    
     const addOnsTotal = selectedAddOns.reduce((sum, addOnId) => {
       const addOn = addOns.find((a) => a.id === addOnId);
       return sum + (addOn ? addOn.price : 0);
@@ -259,9 +320,11 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
     
     const customizedItem = {
       ...item,
-      price: item.price + addOnsTotal, // Update price to include add-ons
+      price: item.price + sizeAdjustment + addOnsTotal, // Update price to include size and add-ons
       addOnIDs: selectedAddOns,
+      temperature: temperature,
       ice: iceLevel,
+      size: size,
       sweetness: sweetnessLevel,
     };
     onAddToCart(customizedItem);
@@ -292,6 +355,48 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
             </div>
           </div>
 
+          {/* Temperature Selection */}
+          <div className="customization-section">
+            <h4 className="section-title">{translations.temperature || "Temperature"}</h4>
+            <div className="option-buttons">
+              {translatedTemperatureOptions.map((option) => (
+                <button
+                  key={option.value}
+                  className={`option-button ${
+                    temperature === option.value ? "active" : ""
+                  }`}
+                  onClick={() => {
+                    setTemperature(option.value);
+                    // If switching to hot, set ice to "no"
+                    if (option.value === "hot") {
+                      setIceLevel("no");
+                    }
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Size Selection */}
+          <div className="customization-section">
+            <h4 className="section-title">{translations.size || "Size"}</h4>
+            <div className="option-buttons">
+              {translatedSizeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  className={`option-button ${
+                    size === option.value ? "active" : ""
+                  }`}
+                  onClick={() => setSize(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Ice Level Selection */}
           <div className="customization-section">
             <h4 className="section-title">{translations.iceLevel || "Ice Level"}</h4>
@@ -302,7 +407,14 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
                   className={`option-button ${
                     iceLevel === option.value ? "active" : ""
                   }`}
-                  onClick={() => setIceLevel(option.value)}
+                  onClick={() => {
+                    setIceLevel(option.value);
+                    // If selecting ice and temperature is hot, switch to cold
+                    if (option.value !== "no" && temperature === "hot") {
+                      setTemperature("cold");
+                    }
+                  }}
+                  disabled={temperature === "hot" && option.value !== "no"}
                 >
                   {option.label}
                 </button>
