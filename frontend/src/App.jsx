@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Header, MenuGrid, OrderPanel } from "./components";
+import { Header, MenuGrid, OrderPanel, LandingPage } from "./components";
 import { menuAPI, transactionAPI } from "./services/api";
 import { TAX_RATE } from "./constants/menuItems";
 import { API_BASE_URL } from "./config/api";
@@ -30,6 +30,7 @@ function App() {
   const [showEmployeeLogin, setShowEmployeeLogin] = useState(false);
   const [showManagerLogin, setShowManagerLogin] = useState(false);
   const [kioskLanguage, setKioskLanguage] = useState("en");
+  const [showLandingPage, setShowLandingPage] = useState(true);
 
   // Check for existing kiosk user session and OAuth callback on mount
   useEffect(() => {
@@ -43,6 +44,7 @@ function App() {
       // KioskLoginPage will handle extracting user info from query params
       setViewMode("kiosk");
       setShowKioskLogin(true);
+      setShowLandingPage(false);
       return; // Don't check for stored user if OAuth callback is present
     }
     
@@ -65,11 +67,6 @@ function App() {
         setEmployee(employeeInfo);
       } catch (e) {
         localStorage.removeItem("employee");
-      }
-    } else {
-      // If no employee session and in cashier mode, show login
-      if (viewMode === "cashier") {
-        setShowEmployeeLogin(true);
       }
     }
   }, []);
@@ -223,14 +220,48 @@ function App() {
     }
   };
 
-  const toggleViewMode = () => {
-    const newMode = viewMode === "cashier" ? "kiosk" : "cashier";
-    setViewMode(newMode);
-    
-    // If switching to cashier mode and not logged in, show login
-    if (newMode === "cashier" && !employee) {
+  const handleSelectSelfService = () => {
+    setViewMode("kiosk");
+    setShowLandingPage(false);
+    // Check if user is already logged in
+    const storedUser = localStorage.getItem("kiosk_user");
+    if (storedUser) {
+      try {
+        const userInfo = JSON.parse(storedUser);
+        setKioskUser(userInfo);
+      } catch (e) {
+        localStorage.removeItem("kiosk_user");
+      }
+    }
+  };
+
+  const handleSelectCashier = () => {
+    setViewMode("cashier");
+    setShowLandingPage(false);
+    // If not logged in, show login
+    if (!employee) {
       setShowEmployeeLogin(true);
     }
+  };
+
+  const handleSelectManager = () => {
+    setViewMode("cashier");
+    setShowLandingPage(false);
+    // Check if employee is logged in and is a manager
+    if (employee && employee.authLevel === "Manager") {
+      setShowManager(true);
+    } else {
+      // Show manager login
+      setShowManagerLogin(true);
+    }
+  };
+
+  const handleBackToLanding = () => {
+    setShowLandingPage(true);
+    setShowManager(false);
+    setViewMode("kiosk");
+    // Clear any active sessions if needed
+    // Note: We keep sessions in localStorage so users can return without re-logging
   };
 
   const handleKioskLoginSuccess = (userInfo) => {
@@ -295,9 +326,7 @@ function App() {
           }}
           onCancel={() => {
             setShowManagerLogin(false);
-            if (!employee) {
-              setShowEmployeeLogin(true);
-            }
+            setShowLandingPage(true);
           }}
         />
       </div>
@@ -311,25 +340,36 @@ function App() {
         <EmployeeLoginPage
           onLoginSuccess={handleEmployeeLoginSuccess}
           onCancel={() => {
-            // Switch to kiosk mode if canceling employee login
+            // Go back to landing page if canceling employee login
             setShowEmployeeLogin(false);
-            setViewMode("kiosk");
+            setShowLandingPage(true);
           }}
         />
       </div>
     );
   }
 
+  // Show landing page if requested
+  if (showLandingPage) {
+    return (
+      <LandingPage
+        onSelectSelfService={handleSelectSelfService}
+        onSelectCashier={handleSelectCashier}
+        onSelectManager={handleSelectManager}
+      />
+    );
+  }
+
   // Show manager view if requested and authenticated
   if (showManager) {
-    return <ManagerView onBack={() => setShowManager(false)} employee={employee} />;
+    return <ManagerView onBack={handleBackToLanding} employee={employee} />;
   }
 
   if (loading) {
     return (
       <div className="app">
         {viewMode === "cashier" && (
-          <Header viewMode={viewMode} onViewModeChange={toggleViewMode} />
+          <Header onBackToHome={handleBackToLanding} />
         )}
         <main className="main-content">
           <div style={{ padding: "2rem", textAlign: "center" }}>
@@ -344,7 +384,7 @@ function App() {
     return (
       <div className="app">
         {viewMode === "cashier" && (
-          <Header viewMode={viewMode} onViewModeChange={toggleViewMode} />
+          <Header onBackToHome={handleBackToLanding} />
         )}
         <main className="main-content">
           <div style={{ padding: "2rem", textAlign: "center", color: "red" }}>
@@ -362,7 +402,7 @@ function App() {
     return (
       <div className="app">
         {viewMode === "cashier" && (
-          <Header viewMode={viewMode} onViewModeChange={toggleViewMode} />
+          <Header onBackToHome={handleBackToLanding} />
         )}
         <main className="main-content">
           <div style={{ padding: "2rem", textAlign: "center" }}>
@@ -384,7 +424,10 @@ function App() {
         <div className="app">
           <KioskLoginPage 
             onLoginSuccess={handleKioskLoginSuccess}
-            onCancel={() => setShowKioskLogin(false)}
+            onCancel={() => {
+              setShowKioskLogin(false);
+              // If canceling login, stay in kiosk mode (login is optional)
+            }}
           />
         </div>
       );
@@ -399,13 +442,13 @@ function App() {
           onAddToCart={addToCart}
           onRemoveItem={removeFromCart}
           onCompleteTransaction={completeTransaction}
-          onSwitchToCashier={toggleViewMode}
           user={kioskUser}
           onLoginClick={() => setShowKioskLogin(true)}
           onLogout={handleKioskLogout}
           isExpanded={isKioskExpanded}
           onToggleExpanded={() => setIsKioskExpanded(!isKioskExpanded)}
           onLanguageChange={setKioskLanguage}
+          onBackToHome={handleBackToLanding}
         />
         <DrinkCustomizationModal
           item={selectedItem}
@@ -442,8 +485,7 @@ function App() {
   return (
     <div className="app">
       <Header
-        viewMode={viewMode}
-        onViewModeChange={toggleViewMode}
+        onBackToHome={handleBackToLanding}
         onManagerClick={handleManagerClick}
         employee={employee}
         onLogout={handleEmployeeLogout}

@@ -1,7 +1,7 @@
 import NavButton from './NavButton'
 import './Header.css'
 
-function Header({ viewMode, onViewModeChange, onManagerClick, employee, onLogout }) {
+function Header({ onBackToHome, onManagerClick, employee, onLogout }) {
   const navItems = [
     { icon: '⚙️', label: 'Manage', onClick: onManagerClick },
     { icon: '📤', label: 'Log Out', onClick: onLogout },
@@ -22,16 +22,18 @@ function Header({ viewMode, onViewModeChange, onManagerClick, employee, onLogout
             <span className="nav-divider">|</span>
           </div>
         )}
-        <div className="nav-item-wrapper">
-          <button
-            className="view-toggle-button"
-            onClick={onViewModeChange}
-            title={`Switch to ${viewMode === 'cashier' ? 'Kiosk' : 'Cashier'} view`}
-          >
-            {viewMode === 'cashier' ? '🖥️ Kiosk Mode' : '👤 Cashier Mode'}
-          </button>
-          <span className="nav-divider">|</span>
-        </div>
+        {onBackToHome && (
+          <div className="nav-item-wrapper">
+            <button
+              className="view-toggle-button"
+              onClick={onBackToHome}
+              title="Back to Home"
+            >
+              🏠 Home
+            </button>
+            <span className="nav-divider">|</span>
+          </div>
+        )}
         {navItems.map((item, index) => (
           <div key={index} className="nav-item-wrapper">
             <NavButton 

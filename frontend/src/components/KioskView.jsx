@@ -3,7 +3,7 @@ import WeatherWidget from "./WeatherWidget";
 import { translate, translateBatch, clearTranslationCache } from "../utils/translation";
 import "./KioskView.css";
 
-function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, onSwitchToCashier, user, onLoginClick, onLogout, isExpanded, onToggleExpanded, onLanguageChange }) {
+function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, user, onLoginClick, onLogout, isExpanded, onToggleExpanded, onLanguageChange, onBackToHome }) {
   const [filter, setFilter] = useState("all");
   const [currentStep, setCurrentStep] = useState("menu"); // "menu" or "cart"
   const [language, setLanguage] = useState("en"); // "en" or "es"
@@ -214,6 +214,15 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
         <div className="kiosk-cart-view">
           <div className="kiosk-cart-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              {onBackToHome && (
+                <button
+                  className="kiosk-home-button"
+                  onClick={onBackToHome}
+                  title="Back to Home"
+                >
+                  🏠
+                </button>
+              )}
               <h2>
                 <span className="cart-icon">🛒</span>
                 {translations.currentOrder || "Current Order"}
@@ -249,13 +258,6 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
                   </div>
                 )}
               </div>
-              <button
-                className="kiosk-mode-toggle"
-                onClick={onSwitchToCashier}
-                title="Switch to Cashier Mode"
-              >
-                👤
-              </button>
             </div>
             <button 
               className="kiosk-back-button"
@@ -324,6 +326,15 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
     <div className={`kiosk-view ${isExpanded ? 'kiosk-view-expanded' : ''}`}>
       <div className="kiosk-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
+          {onBackToHome && (
+            <button
+              className="kiosk-home-button"
+              onClick={onBackToHome}
+              title="Back to Home"
+            >
+              🏠
+            </button>
+          )}
           <h1 className="kiosk-title">{translations.orderHere || "Order Here"}</h1>
           {user && (
             <div className="kiosk-user-info">
@@ -396,13 +407,6 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
               {translations.logout || "Logout"}
             </button>
           )}
-          <button
-            className="kiosk-mode-toggle"
-            onClick={onSwitchToCashier}
-            title="Switch to Cashier Mode"
-          >
-            👤
-          </button>
         </div>
       </div>
 

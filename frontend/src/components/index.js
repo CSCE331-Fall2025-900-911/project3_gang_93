@@ -18,4 +18,5 @@ export { default as KioskLoginPage } from './KioskLoginPage'
 export { default as EmployeeLoginPage } from './EmployeeLoginPage'
 export { default as WeatherWidget } from './WeatherWidget'
 export { default as DrinkCustomizationModal } from './DrinkCustomizationModal'
+export { default as LandingPage } from './LandingPage'
 

@@ -70,6 +70,22 @@
   font-weight: 500;
 }
 
+.kiosk-home-button {
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kiosk-home-button:hover {
+  background: #e0e0e0;
+  border-color: #999;
+}
+
 .kiosk-login-button,
 .kiosk-logout-button {
   background: #f0f0f0;
