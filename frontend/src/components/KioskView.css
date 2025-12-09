@@ -340,6 +340,9 @@
   border: none;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .kiosk-menu-item-expanded .kiosk-menu-item-add {
@@ -700,6 +703,16 @@
 
   .kiosk-menu-item-expanded .kiosk-menu-item-name {
     font-size: 1.2rem;
+  }
+
+  .kiosk-menu-item-add {
+    font-size: 0.9rem;
+    padding: 0.65rem 1.25rem;
+  }
+
+  .kiosk-menu-item-expanded .kiosk-menu-item-add {
+    font-size: 1rem;
+    padding: 0.85rem 1.5rem;
   }
 
   .kiosk-cart-view {
