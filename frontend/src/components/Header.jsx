@@ -1,7 +1,7 @@
 import NavButton from './NavButton'
 import './Header.css'
 
-function Header({ onBackToHome, onManagerClick, employee, onLogout }) {
+function Header({ onManagerClick, employee, onLogout }) {
   const navItems = [
     { icon: '⚙️', label: 'Manage', onClick: onManagerClick },
     { icon: '📤', label: 'Log Out', onClick: onLogout },
@@ -19,18 +19,6 @@ function Header({ onBackToHome, onManagerClick, employee, onLogout }) {
             <span className="employee-role">
               ({employee.authLevel})
             </span>
-            <span className="nav-divider">|</span>
-          </div>
-        )}
-        {onBackToHome && (
-          <div className="nav-item-wrapper">
-            <button
-              className="view-toggle-button"
-              onClick={onBackToHome}
-              title="Back to Home"
-            >
-              🏠 Home
-            </button>
             <span className="nav-divider">|</span>
           </div>
         )}

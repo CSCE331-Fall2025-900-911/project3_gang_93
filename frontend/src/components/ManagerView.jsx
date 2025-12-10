@@ -7,7 +7,7 @@ import EmployeeManagement from "./EmployeeManagement";
 import MenuManagement from "./MenuManagement";
 import "./ManagerView.css";
 
-function ManagerView({ onBack }) {
+function ManagerView({ onNavigateToPOS }) {
   const [currentView, setCurrentView] = useState("dashboard");
 
   const handleNavigate = (view) => {
@@ -38,9 +38,11 @@ function ManagerView({ onBack }) {
       <div className="manager-sidebar">
         <div className="sidebar-header">
           <h2>Manager</h2>
-          <button className="back-btn" onClick={onBack}>
-            ← Back to POS
-          </button>
+          {onNavigateToPOS && (
+            <button className="back-btn" onClick={onNavigateToPOS}>
+              ← Back to POS
+            </button>
+          )}
         </div>
         <nav className="sidebar-nav">
           <button

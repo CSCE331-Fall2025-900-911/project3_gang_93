@@ -242,7 +242,12 @@ function AppContent() {
     localStorage.removeItem("employee");
     setEmployee(null);
     setCart({});
-    navigate("/");
+    // Redirect to login page instead of landing page
+    if (location.pathname.startsWith("/cashier")) {
+      navigate("/cashier/login", { replace: true });
+    } else if (location.pathname.startsWith("/manager")) {
+      navigate("/manager/login", { replace: true });
+    }
   };
 
   const handleManagerClick = () => {
@@ -251,7 +256,8 @@ function AppContent() {
       return;
     }
     if (employee.authLevel !== "Manager") {
-      navigate("/manager/login");
+      // Pass state indicating we came from POS (cashier view)
+      navigate("/manager/login", { state: { from: "pos" } });
       return;
     }
     navigate("/manager");
@@ -295,7 +301,7 @@ function AppContent() {
     <LandingPage
       onSelectSelfService={() => navigate("/customer")}
       onSelectCashier={() => navigate("/cashier")}
-      onSelectManager={() => navigate("/manager")}
+      onSelectManager={() => navigate("/manager/login", { state: { from: "landing" } })}
     />
   );
 
@@ -304,7 +310,7 @@ function AppContent() {
     <div className="app">
       <KioskLoginPage 
         onLoginSuccess={handleKioskLoginSuccess}
-        onCancel={() => navigate("/customer")}
+        onCancel={() => navigate("/customer", { replace: true })}
       />
     </div>
   );
@@ -368,7 +374,6 @@ function AppContent() {
           isExpanded={isKioskExpanded}
           onToggleExpanded={() => setIsKioskExpanded(!isKioskExpanded)}
           onLanguageChange={setKioskLanguage}
-          onBackToHome={() => navigate("/")}
         />
         {sharedModals}
       </div>
@@ -395,7 +400,6 @@ function AppContent() {
       return (
         <div className="app">
           <Header
-            onBackToHome={() => navigate("/")}
             onManagerClick={handleManagerClick}
             employee={employee}
             onLogout={handleEmployeeLogout}
@@ -413,7 +417,6 @@ function AppContent() {
       return (
         <div className="app">
           <Header
-            onBackToHome={() => navigate("/")}
             onManagerClick={handleManagerClick}
             employee={employee}
             onLogout={handleEmployeeLogout}
@@ -434,7 +437,6 @@ function AppContent() {
       return (
         <div className="app">
           <Header
-            onBackToHome={() => navigate("/")}
             onManagerClick={handleManagerClick}
             employee={employee}
             onLogout={handleEmployeeLogout}
@@ -454,7 +456,6 @@ function AppContent() {
     return (
       <div className="app">
         <Header
-          onBackToHome={() => navigate("/")}
           onManagerClick={handleManagerClick}
           employee={employee}
           onLogout={handleEmployeeLogout}
@@ -497,22 +498,34 @@ function AppContent() {
   };
 
   // Manager Login Component
-  const ManagerLoginRoute = () => (
-    <div className="app">
-      <EmployeeLoginPage
-        title="Manager Login"
-        subtitle="Enter your manager employee ID to access the manager view"
-        onLoginSuccess={(employeeInfo) => {
-          if (employeeInfo.authLevel === "Manager") {
-            handleEmployeeLoginSuccess(employeeInfo);
-          } else {
-            alert("Access denied. Only managers can access this view.");
-          }
-        }}
-        onCancel={() => navigate("/")}
-      />
-    </div>
-  );
+  const ManagerLoginRoute = () => {
+    const previousLocation = location.state?.from;
+    
+    const handleCancel = () => {
+      if (previousLocation === "pos") {
+        navigate("/cashier");
+      } else {
+        navigate("/");
+      }
+    };
+    
+    return (
+      <div className="app">
+        <EmployeeLoginPage
+          title="Manager Login"
+          subtitle="Enter your manager employee ID to access the manager view"
+          onLoginSuccess={(employeeInfo) => {
+            if (employeeInfo.authLevel === "Manager") {
+              handleEmployeeLoginSuccess(employeeInfo);
+            } else {
+              alert("Access denied. Only managers can access this view.");
+            }
+          }}
+          onCancel={handleCancel}
+        />
+      </div>
+    );
+  };
 
   // Manager View Component
   const ManagerViewRoute = () => {
@@ -523,7 +536,7 @@ function AppContent() {
       return <Navigate to="/manager/login" replace />;
     }
 
-    return <ManagerView onBack={() => navigate("/")} employee={employee} />;
+    return <ManagerView employee={employee} onNavigateToPOS={() => navigate("/cashier", { replace: true })} />;
   };
 
   return (

@@ -58,6 +58,12 @@
   padding: 1rem 1.5rem;
   font-size: 1rem;
   font-weight: 500;
+}
+
+.pos-nav-item {
+  background: #f0f0f0;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 0.5rem;
   color: #333;
   cursor: pointer;
   transition: all 0.2s;
