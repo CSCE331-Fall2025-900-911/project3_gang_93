@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Header, MenuGrid, OrderPanel, LandingPage } from "./components";
 import { menuAPI, transactionAPI } from "./services/api";
 import { TAX_RATE } from "./constants/menuItems";
@@ -12,40 +13,36 @@ import KioskLoginPage from "./components/KioskLoginPage";
 import EmployeeLoginPage from "./components/EmployeeLoginPage";
 import "./App.css";
 
-function App() {
+// Shared state provider component
+function AppContent() {
   const [cart, setCart] = useState({});
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [popupOpen, setPopupOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState(null);
-  const [viewMode, setViewMode] = useState("cashier"); // "cashier" or "kiosk"
-  const [showManager, setShowManager] = useState(false);
   const [customizationModalOpen, setCustomizationModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [kioskUser, setKioskUser] = useState(null);
-  const [showKioskLogin, setShowKioskLogin] = useState(false);
   const [isKioskExpanded, setIsKioskExpanded] = useState(false);
   const [employee, setEmployee] = useState(null);
-  const [showEmployeeLogin, setShowEmployeeLogin] = useState(false);
-  const [showManagerLogin, setShowManagerLogin] = useState(false);
   const [kioskLanguage, setKioskLanguage] = useState("en");
-  const [showLandingPage, setShowLandingPage] = useState(true);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Check for existing kiosk user session and OAuth callback on mount
+  // Check for existing sessions on mount
   useEffect(() => {
-    // Check for OAuth callback first - if present, show login page to process it
+    // Check for OAuth callback
     const urlParams = new URLSearchParams(window.location.search);
     const email = urlParams.get("email");
     const error = urlParams.get("error");
     
     if (email || error) {
-      // OAuth callback detected - switch to kiosk mode and show login page
-      // KioskLoginPage will handle extracting user info from query params
-      setViewMode("kiosk");
-      setShowKioskLogin(true);
-      setShowLandingPage(false);
-      return; // Don't check for stored user if OAuth callback is present
+      // OAuth callback detected - redirect to customer login
+      if (location.pathname !== "/customer/login") {
+        navigate("/customer/login", { replace: true });
+      }
+      return;
     }
     
     // Check if user is already logged in from previous session
@@ -69,7 +66,7 @@ function App() {
         localStorage.removeItem("employee");
       }
     }
-  }, []);
+  }, [navigate, location.pathname]);
 
   // Fetch menu items from backend on component mount
   useEffect(() => {
@@ -94,14 +91,12 @@ function App() {
     fetchMenu();
   }, []);
 
-
   const handleItemClick = (item) => {
     setSelectedItem(item);
     setCustomizationModalOpen(true);
   };
 
   const addToCart = (customizedItem) => {
-    // Create a unique key based on item ID and customizations
     const customizationKey = JSON.stringify({
       addOnIDs: (customizedItem.addOnIDs || []).sort(),
       temperature: customizedItem.temperature || "cold",
@@ -168,7 +163,6 @@ function App() {
     setPopupOpen(false);
 
     try {
-      // Calculate total for display
       const cartItems = Object.values(cart);
       const subtotal = cartItems.reduce(
         (sum, item) => sum + item.price * item.quantity,
@@ -187,22 +181,19 @@ function App() {
         }
       }
 
-      // Create transaction via API
       const result = await transactionAPI.create({
         items: cart,
-        transactionType: method.toLowerCase(), // "card" or "cash"
-        customerId: null, // You can add customer lookup later
+        transactionType: method.toLowerCase(),
+        customerId: null,
         tip: tip,
       });
 
-      // Show success message
       let message = `Transaction completed!\nPayment: ${method}\nTransaction ID: ${result.transactionId}`;
       if (tip > 0) {
         message += `\nTip: $${tip.toFixed(2)}`;
       }
       message += `\nTotal: $${total.toFixed(2)}`;
 
-      // Add change information for cash payments
       if (method === "Cash") {
         const change = cashGiven - total;
         if (change > 0) {
@@ -211,8 +202,6 @@ function App() {
       }
 
       setAlertMessage(message);
-
-      // Clear cart
       setCart({});
     } catch (err) {
       console.error("Transaction failed:", err);
@@ -220,60 +209,10 @@ function App() {
     }
   };
 
-  const handleSelectSelfService = () => {
-    setViewMode("kiosk");
-    setShowLandingPage(false);
-    // Check if user is already logged in
-    const storedUser = localStorage.getItem("kiosk_user");
-    if (storedUser) {
-      try {
-        const userInfo = JSON.parse(storedUser);
-        setKioskUser(userInfo);
-      } catch (e) {
-        localStorage.removeItem("kiosk_user");
-      }
-    }
-  };
-
-  const handleSelectCashier = () => {
-    setViewMode("cashier");
-    setShowLandingPage(false);
-    // If not logged in, show login
-    if (!employee) {
-      setShowEmployeeLogin(true);
-    }
-  };
-
-  const handleSelectManager = () => {
-    setViewMode("cashier");
-    setShowLandingPage(false);
-    // Check if employee is logged in and is a manager
-    if (employee && employee.authLevel === "Manager") {
-      setShowManager(true);
-    } else {
-      // Show manager login
-      setShowManagerLogin(true);
-    }
-  };
-
-  const handleBackToLanding = () => {
-    setShowLandingPage(true);
-    setShowManager(false);
-    setViewMode("kiosk");
-    // Clear any active sessions if needed
-    // Note: We keep sessions in localStorage so users can return without re-logging
-  };
-
   const handleKioskLoginSuccess = (userInfo) => {
     console.log("[App] Kiosk login success, user:", userInfo);
     setKioskUser(userInfo);
-    setShowKioskLogin(false);
-    // Ensure we're in kiosk mode
-    setViewMode("kiosk");
-    // Clear any OAuth query params from URL
-    if (window.location.search) {
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
+    navigate("/customer", { replace: true });
   };
 
   const handleKioskLogout = () => {
@@ -285,150 +224,131 @@ function App() {
   const handleEmployeeLoginSuccess = (employeeInfo) => {
     console.log("[App] Employee login success:", employeeInfo);
     setEmployee(employeeInfo);
-    setShowEmployeeLogin(false);
     localStorage.setItem("employee", JSON.stringify(employeeInfo));
+    
+    // Redirect based on where they came from
+    if (location.pathname === "/cashier/login") {
+      navigate("/cashier", { replace: true });
+    } else if (location.pathname === "/manager/login") {
+      if (employeeInfo.authLevel === "Manager") {
+        navigate("/manager", { replace: true });
+      } else {
+        alert("Access denied. Only managers can access this view.");
+      }
+    }
   };
 
   const handleEmployeeLogout = () => {
     localStorage.removeItem("employee");
     setEmployee(null);
     setCart({});
-    setShowEmployeeLogin(true);
+    navigate("/");
   };
 
   const handleManagerClick = () => {
     if (!employee) {
-      setShowEmployeeLogin(true);
+      navigate("/cashier/login");
       return;
     }
     if (employee.authLevel !== "Manager") {
-      setShowManagerLogin(true);
+      navigate("/manager/login");
       return;
     }
-    setShowManager(true);
+    navigate("/manager");
   };
 
-  // Show manager login if trying to access manager view without manager auth
-  if (showManagerLogin) {
-    return (
-      <div className="app">
-        <EmployeeLoginPage
-          title="Manager Login"
-          subtitle="Enter your manager employee ID to access the manager view"
-          onLoginSuccess={(employeeInfo) => {
-            if (employeeInfo.authLevel === "Manager") {
-              handleEmployeeLoginSuccess(employeeInfo);
-              setShowManagerLogin(false);
-              setShowManager(true);
-            } else {
-              alert("Access denied. Only managers can access this view.");
-            }
-          }}
-          onCancel={() => {
-            setShowManagerLogin(false);
-            setShowLandingPage(true);
-          }}
-        />
-      </div>
-    );
-  }
-
-  // Show employee login if not logged in and trying to access cashier view
-  if (showEmployeeLogin && viewMode === "cashier") {
-    return (
-      <div className="app">
-        <EmployeeLoginPage
-          onLoginSuccess={handleEmployeeLoginSuccess}
-          onCancel={() => {
-            // Go back to landing page if canceling employee login
-            setShowEmployeeLogin(false);
-            setShowLandingPage(true);
-          }}
-        />
-      </div>
-    );
-  }
-
-  // Show landing page if requested
-  if (showLandingPage) {
-    return (
-      <LandingPage
-        onSelectSelfService={handleSelectSelfService}
-        onSelectCashier={handleSelectCashier}
-        onSelectManager={handleSelectManager}
+  // Shared modals and components
+  const sharedModals = (
+    <>
+      <DrinkCustomizationModal
+        item={selectedItem}
+        isOpen={customizationModalOpen}
+        onClose={() => {
+          setCustomizationModalOpen(false);
+          setSelectedItem(null);
+        }}
+        onAddToCart={addToCart}
+        isExpanded={isKioskExpanded}
+        language={kioskLanguage}
       />
-    );
-  }
-
-  // Show manager view if requested and authenticated
-  if (showManager) {
-    return <ManagerView onBack={handleBackToLanding} employee={employee} />;
-  }
-
-  if (loading) {
-    return (
-      <div className="app">
-        {viewMode === "cashier" && (
-          <Header onBackToHome={handleBackToLanding} />
+      <PaymentSelector
+        open={popupOpen}
+        onClose={() => setPopupOpen(false)}
+        onSelect={handlePaymentSelect}
+        subtotal={Object.values(cart).reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
         )}
-        <main className="main-content">
-          <div style={{ padding: "2rem", textAlign: "center" }}>
-            <p>Loading menu...</p>
-          </div>
-        </main>
-      </div>
-    );
-  }
+        isExpanded={isKioskExpanded}
+        language={kioskLanguage}
+      />
+      <AlertModal
+        message={alertMessage}
+        show={!!alertMessage}
+        onClose={() => setAlertMessage(null)}
+      />
+    </>
+  );
 
-  if (error) {
-    return (
-      <div className="app">
-        {viewMode === "cashier" && (
-          <Header onBackToHome={handleBackToLanding} />
-        )}
-        <main className="main-content">
-          <div style={{ padding: "2rem", textAlign: "center", color: "red" }}>
-            <p>{error}</p>
-            <p style={{ marginTop: "1rem", fontSize: "0.9rem" }}>
-              Make sure the backend server is running at {API_BASE_URL}
-            </p>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  // Landing Page Component
+  const LandingPageRoute = () => (
+    <LandingPage
+      onSelectSelfService={() => navigate("/customer")}
+      onSelectCashier={() => navigate("/cashier")}
+      onSelectManager={() => navigate("/manager")}
+    />
+  );
 
-  if (menuItems.length === 0) {
-    return (
-      <div className="app">
-        {viewMode === "cashier" && (
-          <Header onBackToHome={handleBackToLanding} />
-        )}
-        <main className="main-content">
-          <div style={{ padding: "2rem", textAlign: "center" }}>
-            <p>No menu items available.</p>
-            <p style={{ marginTop: "1rem", fontSize: "0.9rem", color: "#666" }}>
-              Please check the database connection.
-            </p>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  // Customer Login Component
+  const CustomerLoginRoute = () => (
+    <div className="app">
+      <KioskLoginPage 
+        onLoginSuccess={handleKioskLoginSuccess}
+        onCancel={() => navigate("/customer")}
+      />
+    </div>
+  );
 
-  // Kiosk View - Login is optional
-  if (viewMode === "kiosk") {
-    // Show login modal if user wants to login
-    if (showKioskLogin) {
+  // Customer View Component
+  const CustomerViewRoute = () => {
+    if (loading) {
       return (
         <div className="app">
-          <KioskLoginPage 
-            onLoginSuccess={handleKioskLoginSuccess}
-            onCancel={() => {
-              setShowKioskLogin(false);
-              // If canceling login, stay in kiosk mode (login is optional)
-            }}
-          />
+          <main className="main-content">
+            <div style={{ padding: "2rem", textAlign: "center" }}>
+              <p>Loading menu...</p>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="app">
+          <main className="main-content">
+            <div style={{ padding: "2rem", textAlign: "center", color: "red" }}>
+              <p>{error}</p>
+              <p style={{ marginTop: "1rem", fontSize: "0.9rem" }}>
+                Make sure the backend server is running at {API_BASE_URL}
+              </p>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    if (menuItems.length === 0) {
+      return (
+        <div className="app">
+          <main className="main-content">
+            <div style={{ padding: "2rem", textAlign: "center" }}>
+              <p>No menu items available.</p>
+              <p style={{ marginTop: "1rem", fontSize: "0.9rem", color: "#666" }}>
+                Please check the database connection.
+              </p>
+            </div>
+          </main>
         </div>
       );
     }
@@ -443,13 +363,111 @@ function App() {
           onRemoveItem={removeFromCart}
           onCompleteTransaction={completeTransaction}
           user={kioskUser}
-          onLoginClick={() => setShowKioskLogin(true)}
+          onLoginClick={() => navigate("/customer/login")}
           onLogout={handleKioskLogout}
           isExpanded={isKioskExpanded}
           onToggleExpanded={() => setIsKioskExpanded(!isKioskExpanded)}
           onLanguageChange={setKioskLanguage}
-          onBackToHome={handleBackToLanding}
+          onBackToHome={() => navigate("/")}
         />
+        {sharedModals}
+      </div>
+    );
+  };
+
+  // Cashier Login Component
+  const CashierLoginRoute = () => (
+    <div className="app">
+      <EmployeeLoginPage
+        onLoginSuccess={handleEmployeeLoginSuccess}
+        onCancel={() => navigate("/")}
+      />
+    </div>
+  );
+
+  // Cashier View Component
+  const CashierViewRoute = () => {
+    if (!employee) {
+      return <Navigate to="/cashier/login" replace />;
+    }
+
+    if (loading) {
+      return (
+        <div className="app">
+          <Header
+            onBackToHome={() => navigate("/")}
+            onManagerClick={handleManagerClick}
+            employee={employee}
+            onLogout={handleEmployeeLogout}
+          />
+          <main className="main-content">
+            <div style={{ padding: "2rem", textAlign: "center" }}>
+              <p>Loading menu...</p>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="app">
+          <Header
+            onBackToHome={() => navigate("/")}
+            onManagerClick={handleManagerClick}
+            employee={employee}
+            onLogout={handleEmployeeLogout}
+          />
+          <main className="main-content">
+            <div style={{ padding: "2rem", textAlign: "center", color: "red" }}>
+              <p>{error}</p>
+              <p style={{ marginTop: "1rem", fontSize: "0.9rem" }}>
+                Make sure the backend server is running at {API_BASE_URL}
+              </p>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    if (menuItems.length === 0) {
+      return (
+        <div className="app">
+          <Header
+            onBackToHome={() => navigate("/")}
+            onManagerClick={handleManagerClick}
+            employee={employee}
+            onLogout={handleEmployeeLogout}
+          />
+          <main className="main-content">
+            <div style={{ padding: "2rem", textAlign: "center" }}>
+              <p>No menu items available.</p>
+              <p style={{ marginTop: "1rem", fontSize: "0.9rem", color: "#666" }}>
+                Please check the database connection.
+              </p>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    return (
+      <div className="app">
+        <Header
+          onBackToHome={() => navigate("/")}
+          onManagerClick={handleManagerClick}
+          employee={employee}
+          onLogout={handleEmployeeLogout}
+        />
+        <main className="main-content">
+          <MenuGrid items={menuItems} onItemClick={handleItemClick} />
+          <OrderPanel
+            cart={cart}
+            onRemoveItem={removeFromCart}
+            onAddItem={addToCart}
+            onCompleteTransaction={completeTransaction}
+          />
+        </main>
         <DrinkCustomizationModal
           item={selectedItem}
           isOpen={customizationModalOpen}
@@ -458,8 +476,7 @@ function App() {
             setSelectedItem(null);
           }}
           onAddToCart={addToCart}
-          isExpanded={isKioskExpanded}
-          language={kioskLanguage}
+          language="en"
         />
         <PaymentSelector
           open={popupOpen}
@@ -469,8 +486,6 @@ function App() {
             (sum, item) => sum + item.price * item.quantity,
             0
           )}
-          isExpanded={isKioskExpanded}
-          language={kioskLanguage}
         />
         <AlertModal
           message={alertMessage}
@@ -479,52 +494,54 @@ function App() {
         />
       </div>
     );
-  }
+  };
 
-  // Cashier View
-  return (
+  // Manager Login Component
+  const ManagerLoginRoute = () => (
     <div className="app">
-      <Header
-        onBackToHome={handleBackToLanding}
-        onManagerClick={handleManagerClick}
-        employee={employee}
-        onLogout={handleEmployeeLogout}
-      />
-      <main className="main-content">
-        <MenuGrid items={menuItems} onItemClick={handleItemClick} />
-        <OrderPanel
-          cart={cart}
-          onRemoveItem={removeFromCart}
-          onAddItem={addToCart}
-          onCompleteTransaction={completeTransaction}
-        />
-      </main>
-      <DrinkCustomizationModal
-        item={selectedItem}
-        isOpen={customizationModalOpen}
-        onClose={() => {
-          setCustomizationModalOpen(false);
-          setSelectedItem(null);
+      <EmployeeLoginPage
+        title="Manager Login"
+        subtitle="Enter your manager employee ID to access the manager view"
+        onLoginSuccess={(employeeInfo) => {
+          if (employeeInfo.authLevel === "Manager") {
+            handleEmployeeLoginSuccess(employeeInfo);
+          } else {
+            alert("Access denied. Only managers can access this view.");
+          }
         }}
-        onAddToCart={addToCart}
-        language="en"
-      />
-      <PaymentSelector
-        open={popupOpen}
-        onClose={() => setPopupOpen(false)}
-        onSelect={handlePaymentSelect}
-        subtotal={Object.values(cart).reduce(
-          (sum, item) => sum + item.price * item.quantity,
-          0
-        )}
-      />
-      <AlertModal
-        message={alertMessage}
-        show={!!alertMessage}
-        onClose={() => setAlertMessage(null)}
+        onCancel={() => navigate("/")}
       />
     </div>
   );
+
+  // Manager View Component
+  const ManagerViewRoute = () => {
+    if (!employee) {
+      return <Navigate to="/manager/login" replace />;
+    }
+    if (employee.authLevel !== "Manager") {
+      return <Navigate to="/manager/login" replace />;
+    }
+
+    return <ManagerView onBack={() => navigate("/")} employee={employee} />;
+  };
+
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPageRoute />} />
+      <Route path="/customer" element={<CustomerViewRoute />} />
+      <Route path="/customer/login" element={<CustomerLoginRoute />} />
+      <Route path="/cashier" element={<CashierViewRoute />} />
+      <Route path="/cashier/login" element={<CashierLoginRoute />} />
+      <Route path="/manager" element={<ManagerViewRoute />} />
+      <Route path="/manager/login" element={<ManagerLoginRoute />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+function App() {
+  return <AppContent />;
 }
 
 export default App;
