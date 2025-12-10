@@ -1,38 +1,11 @@
-// Map menu item names to icons
+// Map menu item names to image URLs
 export const getMenuIcon = (menuItemName) => {
-  const name = menuItemName.toLowerCase();
-  
-  // Tea-based drinks
-  if (name.includes('milk tea') || name.includes('black tea') || name.includes('green tea') || name.includes('oolong tea')) {
-    return '🥛';
+  if (!menuItemName) {
+    return null;
   }
   
-  // Latte
-  if (name.includes('latte')) {
-    return '☕';
-  }
-  
-  // Fruit teas
-  if (name.includes('fruit') || name.includes('passion') || name.includes('mango') || name.includes('strawberry') || name.includes('lychee') || name.includes('watermelon')) {
-    return '💧';
-  }
-  
-  // Coffee
-  if (name.includes('coffee')) {
-    return '☕';
-  }
-  
-  // Matcha
-  if (name.includes('matcha')) {
-    return '🍵';
-  }
-  
-  // Taro
-  if (name.includes('taro')) {
-    return '🟣';
-  }
-  
-  // Default
-  return '🥤';
+  // Generate the image path relative to public folder
+  // Images are stored in frontend/icons/ and served as static assets
+  return `/icons/${menuItemName}.png`;
 };
 

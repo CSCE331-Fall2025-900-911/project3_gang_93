@@ -426,7 +426,11 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
             className={`kiosk-menu-item ${isExpanded ? 'kiosk-menu-item-expanded' : ''}`}
             onClick={() => onItemClick(item)}
           >
-            <div className="kiosk-menu-item-icon">{item.icon}</div>
+            <div className="kiosk-menu-item-icon">
+              {item.icon ? (
+                <img src={item.icon} alt={item.name} onError={(e) => { e.target.style.display = 'none'; }} />
+              ) : null}
+            </div>
             <div className="kiosk-menu-item-name">{item.translatedName || item.name}</div>
             <div className="kiosk-menu-item-price">${item.price.toFixed(2)}</div>
             <div className="kiosk-menu-item-add">{translations.customize || "+ Customize"}</div>
