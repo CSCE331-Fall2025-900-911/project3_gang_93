@@ -295,11 +295,34 @@
 .kiosk-menu-item-icon {
   font-size: 3.5rem;
   margin-bottom: 0.5rem;
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kiosk-menu-item-icon img {
+  max-width: 140px;
+  max-height: 140px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
 .kiosk-menu-item-expanded .kiosk-menu-item-icon {
   font-size: 5rem;
   margin-bottom: 0.75rem;
+  width: 200px;
+  height: 200px;
+}
+
+.kiosk-menu-item-expanded .kiosk-menu-item-icon img {
+  max-width: 200px;
+  max-height: 200px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
 .kiosk-menu-item-name {
@@ -691,10 +714,24 @@
 
   .kiosk-menu-item-icon {
     font-size: 2.5rem;
+    width: 100px;
+    height: 100px;
+  }
+
+  .kiosk-menu-item-icon img {
+    max-width: 100px;
+    max-height: 100px;
   }
 
   .kiosk-menu-item-expanded .kiosk-menu-item-icon {
     font-size: 4rem;
+    width: 150px;
+    height: 150px;
+  }
+
+  .kiosk-menu-item-expanded .kiosk-menu-item-icon img {
+    max-width: 150px;
+    max-height: 150px;
   }
 
   .kiosk-menu-item-name {
