@@ -27,6 +27,7 @@ function AppContent() {
   const [isKioskExpanded, setIsKioskExpanded] = useState(false);
   const [employee, setEmployee] = useState(null);
   const [kioskLanguage, setKioskLanguage] = useState("en");
+  const [modalTranslating, setModalTranslating] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -278,6 +279,7 @@ function AppContent() {
         onAddToCart={addToCart}
         isExpanded={isKioskExpanded}
         language={kioskLanguage}
+        onTranslatingChange={setModalTranslating}
       />
       <PaymentSelector
         open={popupOpen}
@@ -376,6 +378,7 @@ function AppContent() {
           isExpanded={isKioskExpanded}
           onToggleExpanded={() => setIsKioskExpanded(!isKioskExpanded)}
           onLanguageChange={setKioskLanguage}
+          modalTranslating={modalTranslating}
         />
         {sharedModals}
       </div>

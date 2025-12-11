@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { addOnsAPI } from "../services/api";
 import { translate, translateBatch, clearTranslationCache } from "../utils/translation";
 import "./DrinkCustomizationModal.css";
@@ -46,7 +46,7 @@ const UI_TEXT_KEYS = {
   addToCart: "Add to Cart",
 };
 
-function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpanded = false, language = "en" }) {
+function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpanded = false, language = "en", onTranslatingChange }) {
   const [addOns, setAddOns] = useState([]);
   const [selectedAddOns, setSelectedAddOns] = useState([]);
   const [temperature, setTemperature] = useState("cold");
@@ -64,9 +64,18 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
   const [translatedAddOns, setTranslatedAddOns] = useState([]);
   const [itemTranslatedName, setItemTranslatedName] = useState(null);
 
-  // Clear cache and translate UI text when language changes or modal opens
+  // Debug: Log when modal receives props
   useEffect(() => {
-    const translateUIText = async () => {
+    console.log("[DrinkCustomizationModal] Props changed - isOpen:", isOpen, "language:", language, "item:", item?.name);
+  }, [isOpen, language, item]);
+
+  // Track previous language to detect actual language changes
+  const prevLanguageRef = useRef(language);
+
+  // Translate ALL content (UI text, options, item name, add-ons) in one batch when language changes
+  // Only translate when language changes, not when modal just opens
+  useEffect(() => {
+    const translateAllContent = async () => {
       // Initialize with English first
       const englishTranslations = {};
       Object.keys(UI_TEXT_KEYS).forEach(key => {
@@ -79,94 +88,109 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
         setTranslatedIceOptions(ICE_OPTIONS);
         setTranslatedSizeOptions(SIZE_OPTIONS);
         setTranslatedSweetnessOptions(SWEETNESS_OPTIONS);
+        if (item) setItemTranslatedName(item.name);
+        setTranslatedAddOns(addOns);
+        setTranslating(false);
+        if (onTranslatingChange) {
+          onTranslatingChange(false);
+        }
         return;
       }
 
-      // If modal is not open, don't translate yet (but set English as fallback)
+      // Only translate if modal is open AND language is not English
+      // Don't translate just because modal opened - only when language changes
       if (!isOpen) {
+        // Set English as fallback, but don't notify parent of translation state
         setTranslations(englishTranslations);
         setTranslatedTemperatureOptions(TEMPERATURE_OPTIONS);
         setTranslatedIceOptions(ICE_OPTIONS);
         setTranslatedSizeOptions(SIZE_OPTIONS);
         setTranslatedSweetnessOptions(SWEETNESS_OPTIONS);
+        setTranslating(false);
+        // Don't call onTranslatingChange when modal is closed
         return;
       }
 
-      // Modal is open and language is not English - translate immediately
-      console.log("[DrinkCustomizationModal] Modal opened with language:", language, "- translating now");
+      // Modal is open and language is not English - translate ALL content in one batch
+      // Only notify parent of translation state if language actually changed (not just modal opening)
+      const languageChanged = prevLanguageRef.current !== language;
+      prevLanguageRef.current = language;
+      
       setTranslating(true);
+      // Only show loading overlay if language actually changed
+      if (onTranslatingChange && languageChanged) {
+        onTranslatingChange(true);
+      }
 
       try {
-        console.log("[DrinkCustomizationModal] Translating UI text to", language);
-        const textsToTranslate = Object.values(UI_TEXT_KEYS);
-        // Force fresh translation by bypassing cache for these specific strings
-        const translatedTexts = await Promise.all(
-          textsToTranslate.map(text => translate(text, language, true))
-        );
-        console.log("[DrinkCustomizationModal] Translated texts:", translatedTexts);
-        console.log("[DrinkCustomizationModal] Original texts:", textsToTranslate);
+        // Collect ALL texts to translate in one batch: UI text, options, item name, add-ons
+        const allTexts = [
+          ...Object.values(UI_TEXT_KEYS),
+          ...TEMPERATURE_OPTIONS.map(opt => opt.label),
+          ...ICE_OPTIONS.map(opt => opt.label),
+          ...SIZE_OPTIONS.map(opt => opt.label),
+          ...SWEETNESS_OPTIONS.map(opt => opt.label),
+          ...(item ? [item.name] : []),
+          ...addOns.map(addOn => addOn.name),
+        ];
+
+        // Use batch translation API (respects cache automatically, won't retranslate cached items)
+        const allTranslated = await translateBatch(allTexts, language);
+
+        // Map translations back to their components
+        let index = 0;
         
+        // UI text translations
         const newTranslations = {};
-        Object.keys(UI_TEXT_KEYS).forEach((key, index) => {
-          newTranslations[key] = translatedTexts[index];
-          // Log if translation didn't change
-          if (translatedTexts[index] === textsToTranslate[index] && language !== "en") {
-            console.warn(`[DrinkCustomizationModal] "${textsToTranslate[index]}" was not translated (returned same text) - key: ${key}`);
-          }
-          // Debug log for specific keys
-          if (key === "base" || key === "total") {
-            console.log(`[DrinkCustomizationModal] Translation for "${key}": "${textsToTranslate[index]}" -> "${translatedTexts[index]}"`);
-          }
+        Object.keys(UI_TEXT_KEYS).forEach((key) => {
+          newTranslations[key] = allTranslated[index++];
         });
-        console.log("[DrinkCustomizationModal] Final translations object:", newTranslations);
         setTranslations(newTranslations);
 
-        // Translate temperature options
-        console.log("[DrinkCustomizationModal] Translating temperature options");
-        const temperatureLabels = TEMPERATURE_OPTIONS.map(opt => opt.label);
-        const translatedTemperatureLabels = await Promise.all(
-          temperatureLabels.map(label => translate(label, language, true))
-        );
+        // Temperature options
+        const translatedTemperatureLabels = allTranslated.slice(index, index + TEMPERATURE_OPTIONS.length);
+        index += TEMPERATURE_OPTIONS.length;
         setTranslatedTemperatureOptions(TEMPERATURE_OPTIONS.map((opt, idx) => ({
           ...opt,
           label: translatedTemperatureLabels[idx]
         })));
 
-        // Translate ice options
-        console.log("[DrinkCustomizationModal] Translating ice options");
-        const iceLabels = ICE_OPTIONS.map(opt => opt.label);
-        const translatedIceLabels = await Promise.all(
-          iceLabels.map(label => translate(label, language, true))
-        );
-        console.log("[DrinkCustomizationModal] Translated ice labels:", translatedIceLabels);
+        // Ice options
+        const translatedIceLabels = allTranslated.slice(index, index + ICE_OPTIONS.length);
+        index += ICE_OPTIONS.length;
         setTranslatedIceOptions(ICE_OPTIONS.map((opt, idx) => ({
           ...opt,
           label: translatedIceLabels[idx]
         })));
 
-        // Translate size options
-        console.log("[DrinkCustomizationModal] Translating size options");
-        const sizeLabels = SIZE_OPTIONS.map(opt => opt.label);
-        const translatedSizeLabels = await Promise.all(
-          sizeLabels.map(label => translate(label, language, true))
-        );
+        // Size options
+        const translatedSizeLabels = allTranslated.slice(index, index + SIZE_OPTIONS.length);
+        index += SIZE_OPTIONS.length;
         setTranslatedSizeOptions(SIZE_OPTIONS.map((opt, idx) => ({
           ...opt,
           label: translatedSizeLabels[idx]
         })));
 
-        // Translate sweetness options
-        console.log("[DrinkCustomizationModal] Translating sweetness options");
-        const sweetnessLabels = SWEETNESS_OPTIONS.map(opt => opt.label);
-        const translatedSweetnessLabels = await Promise.all(
-          sweetnessLabels.map(label => translate(label, language, true))
-        );
-        console.log("[DrinkCustomizationModal] Translated sweetness labels:", translatedSweetnessLabels);
-        console.log("[DrinkCustomizationModal] Original sweetness labels:", sweetnessLabels);
+        // Sweetness options
+        const translatedSweetnessLabels = allTranslated.slice(index, index + SWEETNESS_OPTIONS.length);
+        index += SWEETNESS_OPTIONS.length;
         setTranslatedSweetnessOptions(SWEETNESS_OPTIONS.map((opt, idx) => ({
           ...opt,
           label: translatedSweetnessLabels[idx]
         })));
+
+        // Item name
+        if (item) {
+          setItemTranslatedName(allTranslated[index++]);
+        }
+
+        // Add-ons
+        const translatedAddOnNames = allTranslated.slice(index);
+        setTranslatedAddOns(addOns.map((addOn, idx) => ({
+          ...addOn,
+          translatedName: translatedAddOnNames[idx] || addOn.name
+        })));
+
         console.log("[DrinkCustomizationModal] All translations completed");
       } catch (error) {
         console.error("[DrinkCustomizationModal] Failed to translate:", error);
@@ -175,94 +199,42 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
         setTranslatedIceOptions(ICE_OPTIONS);
         setTranslatedSizeOptions(SIZE_OPTIONS);
         setTranslatedSweetnessOptions(SWEETNESS_OPTIONS);
+        if (item) setItemTranslatedName(item.name);
+        setTranslatedAddOns(addOns);
       } finally {
         setTranslating(false);
+        // Only notify parent if we notified it of translation start
+        if (onTranslatingChange && prevLanguageRef.current === language) {
+          onTranslatingChange(false);
+        }
       }
     };
 
-    translateUIText();
-  }, [language, isOpen]);
+    translateAllContent();
+    // Only depend on language - don't retranslate when modal just opens or item/addOns change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
 
-  // Translate item name when item or language changes
-  useEffect(() => {
-    const translateItemName = async () => {
-      if (!item) {
-        setItemTranslatedName(null);
-        return;
-      }
-
-      if (language === "en") {
-        setItemTranslatedName(item.name);
-        return;
-      }
-
-      if (!isOpen) {
-        return; // Don't translate if modal is closed
-      }
-
-      try {
-        console.log("[DrinkCustomizationModal] Translating item name:", item.name);
-        const translated = await translate(item.name, language, true); // Force refresh
-        console.log("[DrinkCustomizationModal] Translated item name:", translated);
-        setItemTranslatedName(translated);
-      } catch (error) {
-        console.error("[DrinkCustomizationModal] Failed to translate item name:", error);
-        setItemTranslatedName(item.name);
-      }
-    };
-
-    translateItemName();
-  }, [item, language, isOpen]);
-
-  // Translate add-ons when they load or language changes
-  useEffect(() => {
-    const translateAddOns = async () => {
-      if (addOns.length === 0) {
-        setTranslatedAddOns([]);
-        return;
-      }
-
-      if (language === "en") {
-        setTranslatedAddOns(addOns);
-        return;
-      }
-
-      if (!isOpen) {
-        return; // Don't translate if modal is closed
-      }
-
-      try {
-        console.log("[DrinkCustomizationModal] Translating add-ons");
-        const addOnNames = addOns.map(addOn => addOn.name);
-        // Force fresh translation for add-ons
-        const translatedNames = await Promise.all(
-          addOnNames.map(name => translate(name, language, true))
-        );
-        console.log("[DrinkCustomizationModal] Translated add-on names:", translatedNames);
-        setTranslatedAddOns(addOns.map((addOn, idx) => ({
-          ...addOn,
-          translatedName: translatedNames[idx]
-        })));
-      } catch (error) {
-        console.error("[DrinkCustomizationModal] Failed to translate add-ons:", error);
-        setTranslatedAddOns(addOns);
-      }
-    };
-
-    translateAddOns();
-  }, [addOns, language, isOpen]);
+  // Item name and add-ons are now translated in the main batch translation effect above
 
   useEffect(() => {
     if (isOpen) {
-      fetchAddOns();
       // Reset selections when modal opens
       setSelectedAddOns([]);
       setTemperature("cold");
       setIceLevel("normal");
       setSize("regular");
       setSweetnessLevel("100%");
+      // Fetch add-ons - translations will happen after add-ons load (via dependency array)
+      fetchAddOns();
+    } else {
+      // Reset translating state when modal closes
+      setTranslating(false);
+      if (onTranslatingChange) {
+        onTranslatingChange(false);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, onTranslatingChange]);
 
   const fetchAddOns = async () => {
     try {
@@ -329,7 +301,16 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
     onClose();
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    // Reset translating state when modal is closed
+    if (translating) {
+      setTranslating(false);
+      if (onTranslatingChange) {
+        onTranslatingChange(false);
+      }
+    }
+    return null;
+  }
 
   return (
     <div className="customization-modal-overlay" onClick={onClose}>
@@ -337,6 +318,8 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
         className={`customization-modal ${isExpanded ? 'customization-modal-expanded' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* No loading overlay in modal - main KioskView handles it */}
+        
         <div className="customization-modal-header">
           <h2 className="customization-modal-title">{translations.customizeYourDrink || "Customize Your Drink"}</h2>
           <button className="customization-modal-close" onClick={onClose}>

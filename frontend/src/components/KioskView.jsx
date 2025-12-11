@@ -3,7 +3,7 @@ import WeatherWidget from "./WeatherWidget";
 import { translate, translateBatch, clearTranslationCache } from "../utils/translation";
 import "./KioskView.css";
 
-function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, user, onLoginClick, onLogout, isExpanded, onToggleExpanded, onLanguageChange }) {
+function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, user, onLoginClick, onLogout, isExpanded, onToggleExpanded, onLanguageChange, modalTranslating = false }) {
   const [filter, setFilter] = useState("all");
   const [currentStep, setCurrentStep] = useState("menu"); // "menu" or "cart"
   const [language, setLanguage] = useState(() => {
@@ -253,7 +253,9 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
   }, [filter, translatedMenuItems]);
 
   // Calculate if any translation is in progress
-  const isTranslating = translating || translatingMenuItems || translatingCart;
+  // Only show loading when language is actually changing (not when just opening modal)
+  // Include modalTranslating to wait for modal translations too
+  const isTranslating = (translating || translatingMenuItems || translatingCart || modalTranslating);
 
   if (currentStep === "cart" && cartItems.length > 0) {
     return (
