@@ -1288,8 +1288,8 @@ def google_callback(code: str):
         "sub": sub
     })
 
-    # Redirect to frontend root with user info (frontend will handle kiosk mode)
-    redirect_url = f"{frontend}?{params}"
+    # Redirect to frontend customer login page with user info
+    redirect_url = f"{frontend}/customer/login?{params}"
     print(f"[OAuth] Redirecting to frontend: {redirect_url}")
     return RedirectResponse(url=redirect_url)
 

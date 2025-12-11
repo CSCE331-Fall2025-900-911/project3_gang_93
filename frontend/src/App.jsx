@@ -38,9 +38,11 @@ function AppContent() {
     const error = urlParams.get("error");
     
     if (email || error) {
-      // OAuth callback detected - redirect to customer login
+      // OAuth callback detected - ensure we're on customer login page with params preserved
       if (location.pathname !== "/customer/login") {
-        navigate("/customer/login", { replace: true });
+        // Preserve query params when redirecting
+        const currentParams = window.location.search;
+        navigate(`/customer/login${currentParams}`, { replace: true });
       }
       return;
     }
