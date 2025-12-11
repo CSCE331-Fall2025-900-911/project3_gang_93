@@ -48,15 +48,24 @@ export const translate = async (
   if (targetLanguage !== "en" && fallbackTranslations[targetLanguage]) {
     if (fallbackTranslations[targetLanguage][text]) {
       const fallback = fallbackTranslations[targetLanguage][text];
-      // Update cache with fallback
+      // Always update cache with fallback to override any existing cached value
       translationCache.set(cacheKey, fallback);
       return fallback;
     }
   }
 
   // Check cache (unless forcing refresh)
+  // But skip cache if a fallback exists (to ensure fallback is used)
   if (!forceRefresh && translationCache.has(cacheKey)) {
     const cached = translationCache.get(cacheKey);
+    // Double-check: if fallback exists, use it instead of cache
+    if (targetLanguage !== "en" && fallbackTranslations[targetLanguage]) {
+      if (fallbackTranslations[targetLanguage][text]) {
+        const fallback = fallbackTranslations[targetLanguage][text];
+        translationCache.set(cacheKey, fallback);
+        return fallback;
+      }
+    }
     // Reduced logging for performance
     return cached;
   }
@@ -130,7 +139,7 @@ export const translateBatch = async (texts, targetLanguage = "en") => {
     return texts;
   }
 
-  // Filter out cached texts and empty texts
+  // Filter out cached texts, empty texts, and check for fallbacks
   const textsToTranslate = [];
   const cachedResults = [];
   const textIndices = [];
@@ -139,6 +148,17 @@ export const translateBatch = async (texts, targetLanguage = "en") => {
     if (!text || text.trim() === "") {
       cachedResults[index] = text;
     } else {
+      // Check for fallback translation FIRST
+      if (targetLanguage !== "en" && fallbackTranslations[targetLanguage]) {
+        if (fallbackTranslations[targetLanguage][text]) {
+          const fallback = fallbackTranslations[targetLanguage][text];
+          const cacheKey = getCacheKey(text, targetLanguage);
+          translationCache.set(cacheKey, fallback);
+          cachedResults[index] = fallback;
+          return; // Skip API call for this text
+        }
+      }
+      
       const cacheKey = getCacheKey(text, targetLanguage);
       if (translationCache.has(cacheKey)) {
         cachedResults[index] = translationCache.get(cacheKey);
@@ -149,7 +169,7 @@ export const translateBatch = async (texts, targetLanguage = "en") => {
     }
   });
 
-  // If all texts are cached, return cached results
+  // If all texts are cached or have fallbacks, return results
   if (textsToTranslate.length === 0) {
     return texts.map((text, index) => cachedResults[index] || text);
   }
@@ -163,12 +183,21 @@ export const translateBatch = async (texts, targetLanguage = "en") => {
     textIndices.forEach((originalIndex, batchIndex) => {
       const translated = batchTranslations[batchIndex];
       const originalText = textsToTranslate[batchIndex];
+      
+      // Check for fallback translation after API call
+      let finalTranslation = translated;
+      if (targetLanguage !== "en" && fallbackTranslations[targetLanguage]) {
+        if (fallbackTranslations[targetLanguage][originalText]) {
+          finalTranslation = fallbackTranslations[targetLanguage][originalText];
+        }
+      }
+      
       const cacheKey = getCacheKey(originalText, targetLanguage);
-      translationCache.set(cacheKey, translated);
-      results[originalIndex] = translated;
+      translationCache.set(cacheKey, finalTranslation);
+      results[originalIndex] = finalTranslation;
     });
     
-    // Fill in cached results
+    // Fill in cached results (including fallbacks)
     cachedResults.forEach((cached, index) => {
       if (cached !== undefined) {
         results[index] = cached;

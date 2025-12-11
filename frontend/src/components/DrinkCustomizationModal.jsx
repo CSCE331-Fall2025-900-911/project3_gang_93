@@ -9,7 +9,7 @@ const TEMPERATURE_OPTIONS = [
 ];
 
 const ICE_OPTIONS = [
-  { value: "no", label: "No Ice" },
+  { value: "no ice", label: "No Ice" },
   { value: "light", label: "Light Ice" },
   { value: "normal", label: "Normal Ice" },
   { value: "extra", label: "Extra Ice" },
@@ -424,11 +424,11 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
                   onClick={() => {
                     setIceLevel(option.value);
                     // If selecting ice and temperature is hot, switch to cold
-                    if (option.value !== "no" && temperature === "hot") {
+                    if (option.value !== "no ice" && temperature === "hot") {
                       setTemperature("cold");
                     }
                   }}
-                  disabled={temperature === "hot" && option.value !== "no"}
+                  disabled={temperature === "hot" && option.value !== "no ice"}
                 >
                   {option.label}
                 </button>

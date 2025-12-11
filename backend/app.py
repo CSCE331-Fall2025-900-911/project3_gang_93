@@ -364,6 +364,15 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                 item_total = float(menu_item['price']) * item.quantity
                 total += item_total
                 
+                # Preserve all item fields including add-ons, ice, sweetness, etc.
+                item_data = {
+                    "menuItemId": item.menuItemId,
+                    "quantity": item.quantity,
+                    "addOnIDs": item.addOnIDs,
+                    "ice": item.ice,
+                    "sweetness": item.sweetness
+                }
+                items_with_prices.append(item_data)
                 
                 # Prepare inventory updates (for background processing)
                 ingredients = menu_item['ingredients']
@@ -1461,29 +1470,33 @@ def get_x_report(report_date: Optional[str] = Query(None, description="Report da
         cash_payments = float(totals_result['cash_total']) if totals_result and totals_result['cash_total'] else 0.0
         card_payments = float(totals_result['card_total']) if totals_result and totals_result['card_total'] else 0.0
         
-        # Calculate void totals
+        # Calculate void totals using same approach
         void_totals_query = """
             SELECT
-                SUM(
-                    COALESCE(
-                        (SELECT SUM(m.price * (item->>'quantity')::int)
-                         FROM jsonb_array_elements(
-                             CASE 
-                                 WHEN jsonb_typeof(t.items) = 'array' THEN t.items
-                                 ELSE t.items->'items'
-                             END
-                         ) AS item
-                         LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
-                         WHERE m.menuItemId IS NOT NULL),
-                        0
-                    ) + COALESCE(
-                        CASE 
-                            WHEN jsonb_typeof(t.items) = 'object' THEN (t.items->>'tip')::numeric
-                            ELSE 0
-                        END, 0
-                    )
-                ) as void_total
+                COALESCE(SUM(item_total + tip_amount), 0) as void_total
             FROM transactions t
+            CROSS JOIN LATERAL (
+                SELECT 
+                    COALESCE(
+                        SUM(m.price * (item->>'quantity')::int),
+                        0
+                    ) as item_total,
+                    COALESCE(
+                        CASE 
+                            WHEN jsonb_typeof(t.items) = 'object' AND t.items ? 'tip' THEN (t.items->>'tip')::numeric
+                            ELSE 0
+                        END,
+                        0
+                    ) as tip_amount
+                FROM jsonb_array_elements(
+                    CASE 
+                        WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                        WHEN jsonb_typeof(t.items) = 'object' AND t.items ? 'items' THEN t.items->'items'
+                        ELSE '[]'::jsonb
+                    END
+                ) AS item
+                LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+            ) AS item_calc
             WHERE t.date = %s AND t.transactionType = 'void'
         """
         

@@ -11,7 +11,7 @@ React + Vite frontend for the POS System.
 ### Installation
 
 ```bash
-npm install
+npm installgit
 ```
 
 ### Development

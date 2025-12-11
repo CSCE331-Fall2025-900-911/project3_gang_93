@@ -12,7 +12,7 @@ function CartItem({ item, onRemove, onAddItem, cartKey }) {
     customizations.push(`${item.size.charAt(0).toUpperCase() + item.size.slice(1)}`);
   }
   if (item.ice && item.ice !== "normal") {
-    const iceLabel = item.ice === "no" ? "No Ice" : 
+    const iceLabel = item.ice === "no ice" ? "No Ice" : 
                      item.ice === "light" ? "Light Ice" :
                      item.ice === "extra" ? "Extra Ice" : "Normal Ice";
     customizations.push(iceLabel);
