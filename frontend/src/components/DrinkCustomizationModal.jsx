@@ -348,16 +348,18 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
 
         <div className="customization-modal-content">
           <div className="customization-drink-info">
-            {item.icon && (
+            {item && item.icon && (
               <div className="drink-icon">
                 <img 
                   src={item.icon}
                   alt={itemTranslatedName || item.name}
                   onError={(e) => {
                     // Hide image if it fails to load (e.g., file doesn't exist on deployed server)
+                    console.warn(`[DrinkCustomizationModal] Failed to load image for ${item.name}:`, item.icon);
                     e.target.style.display = 'none';
                   }}
                   loading="lazy"
+                  key={`${item.id}-${language}`}
                 />
               </div>
             )}

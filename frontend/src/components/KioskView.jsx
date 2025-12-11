@@ -6,11 +6,17 @@ import "./KioskView.css";
 function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, user, onLoginClick, onLogout, isExpanded, onToggleExpanded, onLanguageChange }) {
   const [filter, setFilter] = useState("all");
   const [currentStep, setCurrentStep] = useState("menu"); // "menu" or "cart"
-  const [language, setLanguage] = useState("en"); // "en" or "es"
+  const [language, setLanguage] = useState(() => {
+    // Initialize from localStorage if available, otherwise default to "en"
+    const saved = localStorage.getItem("kiosk_language");
+    return saved || "en";
+  }); // "en" or "es"
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const languageDropdownRef = useRef(null);
   const [translations, setTranslations] = useState({});
   const [translating, setTranslating] = useState(false);
+  const [translatingMenuItems, setTranslatingMenuItems] = useState(false);
+  const [translatingCart, setTranslatingCart] = useState(false);
 
   const languages = {
     en: "English",
@@ -43,39 +49,60 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
     if (onLanguageChange) {
       onLanguageChange(language);
     }
-  }, [language, onLanguageChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]); // Only depend on language, not onLanguageChange to avoid unnecessary re-runs
 
   // Clear translation cache when language changes to ensure fresh translations
+  // Only clear cache when switching TO a different language (not on initial mount)
   useEffect(() => {
-    clearTranslationCache();
+    // Don't clear cache on initial mount, only when language actually changes
+    const timer = setTimeout(() => {
+      clearTranslationCache();
+    }, 100);
+    return () => clearTimeout(timer);
   }, [language]);
 
   // Translate UI text when language changes
   useEffect(() => {
     const translateUIText = async () => {
-      if (language === "en") {
+      const currentLanguage = language; // Capture current language at start
+      console.log("[KioskView] Language changed to:", currentLanguage);
+      
+      if (currentLanguage === "en") {
         // Reset to English
         const englishTranslations = {};
         Object.keys(uiTextKeys).forEach(key => {
           englishTranslations[key] = uiTextKeys[key];
         });
         setTranslations(englishTranslations);
+        setTranslating(false);
         return;
       }
 
       setTranslating(true);
       try {
+        console.log("[KioskView] Starting translation to", currentLanguage);
         const textsToTranslate = Object.values(uiTextKeys);
-        const translatedTexts = await translateBatch(textsToTranslate, language);
+        const translatedTexts = await translateBatch(textsToTranslate, currentLanguage);
+        console.log("[KioskView] Translation complete:", translatedTexts);
+        
+        // Check if language hasn't changed during async operation
+        if (language !== currentLanguage) {
+          console.warn("[KioskView] Language changed during translation, aborting update");
+          return;
+        }
         
         const newTranslations = {};
         Object.keys(uiTextKeys).forEach((key, index) => {
           newTranslations[key] = translatedTexts[index];
         });
         
-        setTranslations(newTranslations);
+        console.log("[KioskView] Setting translations state:", newTranslations, "for language:", currentLanguage);
+        // Force React to recognize the state change by creating a new object
+        setTranslations({ ...newTranslations });
+        console.log("[KioskView] Translations state set, current language:", language);
       } catch (error) {
-        console.error("Failed to translate UI text:", error);
+        console.error("[KioskView] Failed to translate UI text:", error);
         // Fallback to English
         const englishTranslations = {};
         Object.keys(uiTextKeys).forEach(key => {
@@ -98,11 +125,13 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
     const updateTranslatedMenuItems = async () => {
       if (language === "en") {
         setTranslatedMenuItems(menuItems);
+        setTranslatingMenuItems(false);
         return;
       }
 
-      setTranslating(true);
+      setTranslatingMenuItems(true);
       try {
+        console.log("[KioskView] Starting menu items translation to", language);
         const translatedItems = await Promise.all(
           menuItems.map(async (item) => {
             const translatedName = await translate(item.name, language);
@@ -110,15 +139,32 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
             if (translatedName === item.name && language !== "en") {
               console.log(`[Translation] "${item.name}" was not translated (may be a proper noun)`);
             }
-            return { ...item, translatedName };
+            // Preserve all item properties including icon, price, etc.
+            const translatedItem = { 
+              ...item, 
+              translatedName,
+              // Explicitly preserve icon to ensure images show
+              icon: item.icon 
+            };
+            console.log(`[KioskView] Translated item: "${item.name}" -> "${translatedName}"`);
+            return translatedItem;
           })
         );
-        setTranslatedMenuItems(translatedItems);
+        console.log("[KioskView] Menu items translation complete, setting state");
+        console.log("[KioskView] Sample translated item:", translatedItems[0]);
+        // Force React to recognize the state change by creating a new array
+        const newTranslatedItems = translatedItems.map(item => ({ ...item }));
+        setTranslatedMenuItems(newTranslatedItems);
+        console.log("[KioskView] Translated menu items state set, count:", newTranslatedItems.length);
+        // Force a re-render by updating a dummy state if needed
+        setTimeout(() => {
+          console.log("[KioskView] State update should have triggered re-render");
+        }, 0);
       } catch (error) {
         console.error("Failed to translate menu items:", error);
         setTranslatedMenuItems(menuItems);
       } finally {
-        setTranslating(false);
+        setTranslatingMenuItems(false);
       }
     };
 
@@ -130,9 +176,11 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
     const updateTranslatedCart = async () => {
       if (language === "en") {
         setTranslatedCart(cart);
+        setTranslatingCart(false);
         return;
       }
 
+      setTranslatingCart(true);
       try {
         console.log("[KioskView] Translating cart items to", language);
         const translatedCartObj = {};
@@ -140,12 +188,20 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
           // Force fresh translation by bypassing cache
           const translatedName = await translate(item.name, language, true);
           console.log(`[KioskView] Translated cart item: "${item.name}" -> "${translatedName}"`);
-          translatedCartObj[key] = { ...item, translatedName };
+          // Preserve all item properties including icon
+          translatedCartObj[key] = { 
+            ...item, 
+            translatedName,
+            icon: item.icon 
+          };
         }
+        console.log("[KioskView] Cart translation complete, setting state");
         setTranslatedCart(translatedCartObj);
       } catch (error) {
         console.error("[KioskView] Failed to translate cart items:", error);
         setTranslatedCart(cart);
+      } finally {
+        setTranslatingCart(false);
       }
     };
 
@@ -155,17 +211,19 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Check if click is outside the dropdown
       if (languageDropdownRef.current && !languageDropdownRef.current.contains(event.target)) {
         setShowLanguageDropdown(false);
       }
     };
 
     if (showLanguageDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
+      // Use capture phase to ensure we catch the event before it bubbles
+      document.addEventListener("mousedown", handleClickOutside, true);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside, true);
+      };
     }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
   }, [showLanguageDropdown]);
 
   const cartItems = Object.values(translatedCart);
@@ -208,9 +266,18 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
     }
   }, [filter, translatedMenuItems]);
 
+  // Calculate if any translation is in progress
+  const isTranslating = translating || translatingMenuItems || translatingCart;
+
   if (currentStep === "cart" && cartItems.length > 0) {
     return (
       <div className={`kiosk-view ${isExpanded ? 'kiosk-view-expanded' : ''}`}>
+        {isTranslating && (
+          <div className="kiosk-translating-overlay">
+            <div className="kiosk-translating-spinner"></div>
+            <p className="kiosk-translating-text">Translating...</p>
+          </div>
+        )}
         <div className="kiosk-cart-view">
           <div className="kiosk-cart-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -221,16 +288,33 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
               <WeatherWidget city="College Station" language={language} />
               <div className="kiosk-language-selector" ref={languageDropdownRef}>
                 <button 
+                  type="button"
                   className="kiosk-translate-button"
-                  onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log("[KioskView] Language dropdown toggle clicked (cart view), current state:", showLanguageDropdown);
+                    setShowLanguageDropdown(!showLanguageDropdown);
+                  }}
                 >
                   🌐 {languages[language]}
                 </button>
                 {showLanguageDropdown && (
-                  <div className="kiosk-language-dropdown">
+                  <div 
+                    className="kiosk-language-dropdown"
+                    onClick={(e) => {
+                      // Prevent clicks inside dropdown from closing it
+                      e.stopPropagation();
+                    }}
+                  >
                     <button
+                      type="button"
                       className={`kiosk-language-option ${language === "en" ? "active" : ""}`}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log("[KioskView] English button clicked (cart view)");
+                        localStorage.setItem("kiosk_language", "en");
                         setLanguage("en");
                         setShowLanguageDropdown(false);
                       }}
@@ -238,9 +322,15 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
                       English
                     </button>
                     <button
+                      type="button"
                       className={`kiosk-language-option ${language === "es" ? "active" : ""}`}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log("[KioskView] Spanish button clicked (cart view) - BEFORE setLanguage, current language:", language);
+                        localStorage.setItem("kiosk_language", "es");
                         setLanguage("es");
+                        console.log("[KioskView] Spanish button clicked (cart view) - AFTER setLanguage");
                         setShowLanguageDropdown(false);
                       }}
                     >
@@ -315,6 +405,12 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
 
   return (
     <div className={`kiosk-view ${isExpanded ? 'kiosk-view-expanded' : ''}`}>
+      {isTranslating && (
+        <div className="kiosk-translating-overlay">
+          <div className="kiosk-translating-spinner"></div>
+          <p className="kiosk-translating-text">Translating...</p>
+        </div>
+      )}
       <div className="kiosk-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
           <h1 className="kiosk-title">{translations.orderHere || "Order Here"}</h1>
@@ -328,16 +424,33 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
           <WeatherWidget city="College Station" language={language} />
           <div className="kiosk-language-selector" ref={languageDropdownRef}>
             <button 
+              type="button"
               className="kiosk-translate-button"
-              onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("[KioskView] Language dropdown toggle clicked, current state:", showLanguageDropdown);
+                setShowLanguageDropdown(!showLanguageDropdown);
+              }}
             >
               🌐 {languages[language]}
             </button>
             {showLanguageDropdown && (
-              <div className="kiosk-language-dropdown">
+              <div 
+                className="kiosk-language-dropdown"
+                onClick={(e) => {
+                  // Prevent clicks inside dropdown from closing it
+                  e.stopPropagation();
+                }}
+              >
                 <button
+                  type="button"
                   className={`kiosk-language-option ${language === "en" ? "active" : ""}`}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log("[KioskView] English button clicked");
+                    localStorage.setItem("kiosk_language", "en");
                     setLanguage("en");
                     setShowLanguageDropdown(false);
                   }}
@@ -345,9 +458,15 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
                   English
                 </button>
                 <button
+                  type="button"
                   className={`kiosk-language-option ${language === "es" ? "active" : ""}`}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log("[KioskView] Spanish button clicked - BEFORE setLanguage, current language:", language);
+                    localStorage.setItem("kiosk_language", "es");
                     setLanguage("es");
+                    console.log("[KioskView] Spanish button clicked - AFTER setLanguage");
                     setShowLanguageDropdown(false);
                   }}
                 >
@@ -419,23 +538,33 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
         </button>
       </div>
 
-      <div className={`kiosk-menu-grid ${isExpanded ? 'kiosk-menu-grid-expanded' : ''}`}>
-        {filteredItems.map(item => (
-          <div
-            key={item.id}
-            className={`kiosk-menu-item ${isExpanded ? 'kiosk-menu-item-expanded' : ''}`}
-            onClick={() => onItemClick(item)}
-          >
-            <div className="kiosk-menu-item-icon">
-              {item.icon ? (
-                <img src={item.icon} alt={item.name} onError={(e) => { e.target.style.display = 'none'; }} />
-              ) : null}
+      <div className={`kiosk-menu-grid ${isExpanded ? 'kiosk-menu-grid-expanded' : ''}`} key={`menu-grid-${language}`}>
+        {filteredItems.map(item => {
+          const displayName = item.translatedName || item.name;
+          return (
+            <div
+              key={`${item.id}-${language}`}
+              className={`kiosk-menu-item ${isExpanded ? 'kiosk-menu-item-expanded' : ''}`}
+              onClick={() => onItemClick(item)}
+            >
+              <div className="kiosk-menu-item-icon">
+                {item.icon ? (
+                  <img 
+                    src={item.icon} 
+                    alt={displayName} 
+                    onError={(e) => { 
+                      console.warn(`[KioskView] Failed to load image for ${item.name}:`, item.icon);
+                      e.target.style.display = 'none'; 
+                    }} 
+                  />
+                ) : null}
+              </div>
+              <div className="kiosk-menu-item-name">{displayName}</div>
+              <div className="kiosk-menu-item-price">${item.price.toFixed(2)}</div>
+              <div className="kiosk-menu-item-add">{translations.customize || "+ Customize"}</div>
             </div>
-            <div className="kiosk-menu-item-name">{item.translatedName || item.name}</div>
-            <div className="kiosk-menu-item-price">${item.price.toFixed(2)}</div>
-            <div className="kiosk-menu-item-add">{translations.customize || "+ Customize"}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {filteredItems.length === 0 && (
