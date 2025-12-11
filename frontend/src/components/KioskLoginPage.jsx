@@ -38,12 +38,15 @@ function KioskLoginPage({ onLoginSuccess, onCancel }) {
       // Store in localStorage for session persistence
       localStorage.setItem("kiosk_user", JSON.stringify(userInfo));
       
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // Clean up URL immediately
+      window.history.replaceState({}, document.title, "/customer/login");
       
-      // Notify parent component
-      console.log("[KioskLoginPage] Calling onLoginSuccess");
-      onLoginSuccess(userInfo);
+      // Notify parent component (this will navigate to /customer)
+      // Use setTimeout to ensure URL cleanup happens before navigation
+      setTimeout(() => {
+        console.log("[KioskLoginPage] Calling onLoginSuccess");
+        onLoginSuccess(userInfo);
+      }, 0);
     } else {
       // Check if user is already logged in from previous session
       const storedUser = localStorage.getItem("kiosk_user");

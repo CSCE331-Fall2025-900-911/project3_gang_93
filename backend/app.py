@@ -1288,8 +1288,9 @@ def google_callback(code: str):
         "sub": sub
     })
 
-    # Redirect to frontend customer login page with user info
-    redirect_url = f"{frontend}/customer/login?{params}"
+    # Redirect to frontend root with user info - App.jsx will handle routing
+    # This avoids 404 errors on routes that don't exist server-side
+    redirect_url = f"{frontend}/?{params}"
     print(f"[OAuth] Redirecting to frontend: {redirect_url}")
     return RedirectResponse(url=redirect_url)
 
