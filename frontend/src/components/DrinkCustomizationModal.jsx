@@ -348,7 +348,18 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
 
         <div className="customization-modal-content">
           <div className="customization-drink-info">
-            <div className="drink-icon">{item.icon}</div>
+            {item.icon && (
+              <div className="drink-icon">
+                <img 
+                  src={item.icon} 
+                  alt={itemTranslatedName || item.name}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextElementSibling?.style.display && (e.target.nextElementSibling.style.display = 'block');
+                  }}
+                />
+              </div>
+            )}
             <div className="drink-details">
               <h3 className="drink-name">{itemTranslatedName || item.name}</h3>
               <p className="drink-base-price">{translations.base || "Base"}: ${item.price.toFixed(2)}</p>
