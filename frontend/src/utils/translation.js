@@ -14,6 +14,8 @@ const fallbackTranslations = {
     "75% (Regular)": "75% (Normal)",
     Normal: "Normal", // "Normal" is the same in Spanish
     "Normal Ice": "Hielo normal", // Translate "Normal Ice" as a phrase
+    "Matcha Latte": "Latte de Matcha", // Matcha Latte translation
+    "Taro Latte": "Latte de Taro", // Taro Latte translation
   },
   en: {
     // English is the base language
@@ -41,7 +43,18 @@ export const translate = async (
 
   const cacheKey = getCacheKey(text, targetLanguage);
 
-  // Check cache first (unless forcing refresh)
+  // Check for fallback translation FIRST (before cache check)
+  // This ensures fallback translations are always used, even if cached
+  if (targetLanguage !== "en" && fallbackTranslations[targetLanguage]) {
+    if (fallbackTranslations[targetLanguage][text]) {
+      const fallback = fallbackTranslations[targetLanguage][text];
+      // Update cache with fallback
+      translationCache.set(cacheKey, fallback);
+      return fallback;
+    }
+  }
+
+  // Check cache (unless forcing refresh)
   if (!forceRefresh && translationCache.has(cacheKey)) {
     const cached = translationCache.get(cacheKey);
     // Reduced logging for performance
