@@ -541,12 +541,12 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/" element={<LandingPageRoute />} />
-      <Route path="/customer" element={<CustomerViewRoute />} />
       <Route path="/customer/login" element={<CustomerLoginRoute />} />
-      <Route path="/cashier" element={<CashierViewRoute />} />
+      <Route path="/customer" element={<CustomerViewRoute />} />
       <Route path="/cashier/login" element={<CashierLoginRoute />} />
-      <Route path="/manager" element={<ManagerViewRoute />} />
+      <Route path="/cashier" element={<CashierViewRoute />} />
       <Route path="/manager/login" element={<ManagerLoginRoute />} />
+      <Route path="/manager" element={<ManagerViewRoute />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

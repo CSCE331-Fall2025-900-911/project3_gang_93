@@ -15,7 +15,12 @@ function KioskLoginPage({ onLoginSuccess, onCancel }) {
     const error = urlParams.get("error");
 
     // Debug logging
-    console.log("[KioskLoginPage] OAuth callback params:", { email, name, sub, error });
+    console.log("[KioskLoginPage] OAuth callback params:", {
+      email,
+      name,
+      sub,
+      error,
+    });
     console.log("[KioskLoginPage] Full URL params:", window.location.search);
 
     if (error) {
@@ -27,20 +32,26 @@ function KioskLoginPage({ onLoginSuccess, onCancel }) {
       const userInfo = {
         email: decodeURIComponent(email),
         name: decodeURIComponent(name || ""),
-        picture: urlParams.get("picture") ? decodeURIComponent(urlParams.get("picture")) : "",
+        picture: urlParams.get("picture")
+          ? decodeURIComponent(urlParams.get("picture"))
+          : "",
         sub: sub ? decodeURIComponent(sub) : email, // Use email as fallback for sub
         firstName: decodeURIComponent(name || "").split(" ")[0] || null,
-        lastName: decodeURIComponent(name || "").split(" ").slice(1).join(" ") || null,
+        lastName:
+          decodeURIComponent(name || "")
+            .split(" ")
+            .slice(1)
+            .join(" ") || null,
       };
-      
+
       console.log("[KioskLoginPage] User info extracted:", userInfo);
-      
+
       // Store in localStorage for session persistence
       localStorage.setItem("kiosk_user", JSON.stringify(userInfo));
-      
+
       // Clean up URL immediately
       window.history.replaceState({}, document.title, "/customer/login");
-      
+
       // Notify parent component (this will navigate to /customer)
       // Use setTimeout to ensure URL cleanup happens before navigation
       setTimeout(() => {
@@ -74,7 +85,9 @@ function KioskLoginPage({ onLoginSuccess, onCancel }) {
       <div className="kiosk-login-container">
         <div className="kiosk-login-header">
           <h1 className="kiosk-login-title">Welcome to Self-Service Kiosk</h1>
-          <p className="kiosk-login-subtitle">Please sign in with your Google account to continue</p>
+          <p className="kiosk-login-subtitle">
+            Please sign in with your Google account to continue
+          </p>
         </div>
 
         <div className="kiosk-login-content">
@@ -130,10 +143,7 @@ function KioskLoginPage({ onLoginSuccess, onCancel }) {
               By signing in, you agree to use this self-service kiosk system.
             </p>
             {onCancel && (
-              <button
-                className="kiosk-login-cancel"
-                onClick={onCancel}
-              >
+              <button className="kiosk-login-cancel" onClick={onCancel}>
                 Continue without signing in
               </button>
             )}
@@ -145,4 +155,3 @@ function KioskLoginPage({ onLoginSuccess, onCancel }) {
 }
 
 export default KioskLoginPage;
-
