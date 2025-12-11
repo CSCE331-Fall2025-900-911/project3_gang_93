@@ -43,8 +43,8 @@ class TransactionItem(BaseModel):
     addOnIDs: Optional[List[int]] = None
     quantity: int
     # Optional customization fields
-    ice: Optional[Literal["light", "normal", "extra"]] = None
-    sweetness: Optional[Literal["0%", "25%", "50%", "75%", "100%"]] = None
+    ice: Optional[Literal["no ice","light", "normal", "extra"]] = None
+    sweetness: Optional[Literal["0%", "25%", "50%", "75%", "100%", "125%"]] = None
 
 class TransactionCreate(BaseModel):
     customerId: Optional[int] = None
