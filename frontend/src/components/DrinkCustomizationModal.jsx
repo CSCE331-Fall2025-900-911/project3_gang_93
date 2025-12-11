@@ -56,6 +56,7 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [translations, setTranslations] = useState({});
+  const [translating, setTranslating] = useState(false);
   const [translatedTemperatureOptions, setTranslatedTemperatureOptions] = useState(TEMPERATURE_OPTIONS);
   const [translatedIceOptions, setTranslatedIceOptions] = useState(ICE_OPTIONS);
   const [translatedSizeOptions, setTranslatedSizeOptions] = useState(SIZE_OPTIONS);
@@ -65,16 +66,6 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
 
   // Clear cache and translate UI text when language changes or modal opens
   useEffect(() => {
-    // Clear cache when modal opens with a new language to force fresh translations
-    if (isOpen && language !== "en") {
-      // Clear specific cache entries for our UI text to force re-translation
-      const textsToClear = Object.values(UI_TEXT_KEYS);
-      textsToClear.forEach(text => {
-        const cacheKey = `${text}|${language}`;
-        // We'll clear these in the translation function itself
-      });
-    }
-
     const translateUIText = async () => {
       // Initialize with English first
       const englishTranslations = {};
@@ -91,8 +82,8 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
         return;
       }
 
+      // If modal is not open, don't translate yet (but set English as fallback)
       if (!isOpen) {
-        // Still set English translations if modal is closed
         setTranslations(englishTranslations);
         setTranslatedTemperatureOptions(TEMPERATURE_OPTIONS);
         setTranslatedIceOptions(ICE_OPTIONS);
@@ -100,6 +91,10 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
         setTranslatedSweetnessOptions(SWEETNESS_OPTIONS);
         return;
       }
+
+      // Modal is open and language is not English - translate immediately
+      console.log("[DrinkCustomizationModal] Modal opened with language:", language, "- translating now");
+      setTranslating(true);
 
       try {
         console.log("[DrinkCustomizationModal] Translating UI text to", language);
@@ -172,6 +167,7 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
           ...opt,
           label: translatedSweetnessLabels[idx]
         })));
+        console.log("[DrinkCustomizationModal] All translations completed");
       } catch (error) {
         console.error("[DrinkCustomizationModal] Failed to translate:", error);
         setTranslations(englishTranslations);
@@ -179,6 +175,8 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
         setTranslatedIceOptions(ICE_OPTIONS);
         setTranslatedSizeOptions(SIZE_OPTIONS);
         setTranslatedSweetnessOptions(SWEETNESS_OPTIONS);
+      } finally {
+        setTranslating(false);
       }
     };
 
