@@ -351,12 +351,13 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
             {item.icon && (
               <div className="drink-icon">
                 <img 
-                  src={item.icon} 
+                  src={item.icon}
                   alt={itemTranslatedName || item.name}
                   onError={(e) => {
+                    // Hide image if it fails to load (e.g., file doesn't exist on deployed server)
                     e.target.style.display = 'none';
-                    e.target.nextElementSibling?.style.display && (e.target.nextElementSibling.style.display = 'block');
                   }}
+                  loading="lazy"
                 />
               </div>
             )}
