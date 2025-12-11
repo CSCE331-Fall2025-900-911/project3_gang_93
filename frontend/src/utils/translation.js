@@ -44,7 +44,7 @@ export const translate = async (
   // Check cache first (unless forcing refresh)
   if (!forceRefresh && translationCache.has(cacheKey)) {
     const cached = translationCache.get(cacheKey);
-    console.log(`[Translation] Cache hit for: "${text}" -> "${cached}"`);
+    // Reduced logging for performance
     return cached;
   }
 
@@ -56,11 +56,14 @@ export const translate = async (
 
   try {
     // Always call translation API - no hardcoded translations
-    console.log(
-      `[Translation] Calling API for: "${text}" -> ${targetLanguage}`
-    );
+    // Reduced logging for performance - only log in development
+    if (import.meta.env.DEV) {
+      console.log(`[Translation] Calling API for: "${text}" -> ${targetLanguage}`);
+    }
     let translated = await translateAPI.translate(text, targetLanguage);
-    console.log(`[Translation] API returned: "${translated}" for "${text}"`);
+    if (import.meta.env.DEV) {
+      console.log(`[Translation] API returned: "${translated}" for "${text}"`);
+    }
 
     // Check for fallback translation - always check if fallback exists
     // This ensures words like "Base", "Total", "Regular" get proper translations
@@ -69,15 +72,17 @@ export const translate = async (
       if (fallbackTranslations[targetLanguage][text]) {
         const fallback = fallbackTranslations[targetLanguage][text];
         // Always use fallback if it exists (for consistency, even if same as original)
-        console.log(
-          `[Translation] Using fallback translation: "${text}" -> "${fallback}" (API returned: "${translated}")`
-        );
+        if (import.meta.env.DEV) {
+          console.log(
+            `[Translation] Using fallback translation: "${text}" -> "${fallback}" (API returned: "${translated}")`
+          );
+        }
         translated = fallback;
       }
     }
 
-    // Log if translation didn't change (even after fallback)
-    if (translated === text && targetLanguage !== "en") {
+    // Log if translation didn't change (even after fallback) - only in dev
+    if (translated === text && targetLanguage !== "en" && import.meta.env.DEV) {
       console.warn(
         `[Translation] Text "${text}" was not translated (API returned same, fallback also same)`
       );
@@ -105,18 +110,67 @@ export const translate = async (
 };
 
 /**
- * Translate multiple texts in parallel
+ * Translate multiple texts efficiently using batch API when available
  */
 export const translateBatch = async (texts, targetLanguage = "en") => {
   if (targetLanguage === "en") {
     return texts;
   }
 
-  const translations = await Promise.all(
-    texts.map((text) => translate(text, targetLanguage))
-  );
+  // Filter out cached texts and empty texts
+  const textsToTranslate = [];
+  const cachedResults = [];
+  const textIndices = [];
+  
+  texts.forEach((text, index) => {
+    if (!text || text.trim() === "") {
+      cachedResults[index] = text;
+    } else {
+      const cacheKey = getCacheKey(text, targetLanguage);
+      if (translationCache.has(cacheKey)) {
+        cachedResults[index] = translationCache.get(cacheKey);
+      } else {
+        textsToTranslate.push(text);
+        textIndices.push(index);
+      }
+    }
+  });
 
-  return translations;
+  // If all texts are cached, return cached results
+  if (textsToTranslate.length === 0) {
+    return texts.map((text, index) => cachedResults[index] || text);
+  }
+
+  try {
+    // Use batch API for better performance
+    const batchTranslations = await translateAPI.translateBatch(textsToTranslate, targetLanguage);
+    
+    // Cache and map results back to original positions
+    const results = [...texts];
+    textIndices.forEach((originalIndex, batchIndex) => {
+      const translated = batchTranslations[batchIndex];
+      const originalText = textsToTranslate[batchIndex];
+      const cacheKey = getCacheKey(originalText, targetLanguage);
+      translationCache.set(cacheKey, translated);
+      results[originalIndex] = translated;
+    });
+    
+    // Fill in cached results
+    cachedResults.forEach((cached, index) => {
+      if (cached !== undefined) {
+        results[index] = cached;
+      }
+    });
+    
+    return results;
+  } catch (error) {
+    console.error("[Translation] Batch translation failed, falling back to individual translations:", error);
+    // Fallback to individual translations if batch fails
+    const translations = await Promise.all(
+      texts.map((text) => translate(text, targetLanguage))
+    );
+    return translations;
+  }
 };
 
 /**

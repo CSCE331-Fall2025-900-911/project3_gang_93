@@ -417,6 +417,22 @@ export const translateAPI = {
       return text;
     }
   },
+  translateBatch: async (texts, targetLanguage) => {
+    try {
+      const result = await apiRequest("/api/translate/batch", {
+        method: "POST",
+        body: JSON.stringify({
+          texts: texts,
+          target_language: targetLanguage,
+        }),
+      });
+      return result.translated_texts;
+    } catch (error) {
+      console.error("Batch translation error:", error);
+      // Fallback to individual translations if batch fails
+      return texts;
+    }
+  },
 };
 
 /**

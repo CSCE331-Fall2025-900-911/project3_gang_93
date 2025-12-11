@@ -81,10 +81,8 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
 
       setTranslating(true);
       try {
-        console.log("[KioskView] Starting translation to", currentLanguage);
         const textsToTranslate = Object.values(uiTextKeys);
         const translatedTexts = await translateBatch(textsToTranslate, currentLanguage);
-        console.log("[KioskView] Translation complete:", translatedTexts);
         
         // Check if language hasn't changed during async operation
         if (language !== currentLanguage) {
@@ -131,35 +129,22 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
 
       setTranslatingMenuItems(true);
       try {
-        console.log("[KioskView] Starting menu items translation to", language);
+        // Translate all menu item names in parallel
         const translatedItems = await Promise.all(
           menuItems.map(async (item) => {
             const translatedName = await translate(item.name, language);
-            // Log if translation didn't change (might be a proper noun)
-            if (translatedName === item.name && language !== "en") {
-              console.log(`[Translation] "${item.name}" was not translated (may be a proper noun)`);
-            }
             // Preserve all item properties including icon, price, etc.
-            const translatedItem = { 
+            return { 
               ...item, 
               translatedName,
               // Explicitly preserve icon to ensure images show
               icon: item.icon 
             };
-            console.log(`[KioskView] Translated item: "${item.name}" -> "${translatedName}"`);
-            return translatedItem;
           })
         );
-        console.log("[KioskView] Menu items translation complete, setting state");
-        console.log("[KioskView] Sample translated item:", translatedItems[0]);
         // Force React to recognize the state change by creating a new array
         const newTranslatedItems = translatedItems.map(item => ({ ...item }));
         setTranslatedMenuItems(newTranslatedItems);
-        console.log("[KioskView] Translated menu items state set, count:", newTranslatedItems.length);
-        // Force a re-render by updating a dummy state if needed
-        setTimeout(() => {
-          console.log("[KioskView] State update should have triggered re-render");
-        }, 0);
       } catch (error) {
         console.error("Failed to translate menu items:", error);
         setTranslatedMenuItems(menuItems);
@@ -182,20 +167,21 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
 
       setTranslatingCart(true);
       try {
-        console.log("[KioskView] Translating cart items to", language);
-        const translatedCartObj = {};
-        for (const [key, item] of Object.entries(cart)) {
-          // Force fresh translation by bypassing cache
-          const translatedName = await translate(item.name, language, true);
-          console.log(`[KioskView] Translated cart item: "${item.name}" -> "${translatedName}"`);
-          // Preserve all item properties including icon
-          translatedCartObj[key] = { 
-            ...item, 
-            translatedName,
-            icon: item.icon 
-          };
-        }
-        console.log("[KioskView] Cart translation complete, setting state");
+        // Translate all cart items in parallel
+        const cartEntries = Object.entries(cart);
+        const translatedEntries = await Promise.all(
+          cartEntries.map(async ([key, item]) => {
+            // Force fresh translation by bypassing cache
+            const translatedName = await translate(item.name, language, true);
+            return [key, { 
+              ...item, 
+              translatedName,
+              icon: item.icon 
+            }];
+          })
+        );
+        // Convert back to object
+        const translatedCartObj = Object.fromEntries(translatedEntries);
         setTranslatedCart(translatedCartObj);
       } catch (error) {
         console.error("[KioskView] Failed to translate cart items:", error);

@@ -43,6 +43,10 @@ class TranslateRequest(BaseModel):
     text: str
     target_language: str # e.g., 'es' for Spanish or 'en' for English
 
+class TranslateBatchRequest(BaseModel):
+    texts: list[str]
+    target_language: str # e.g., 'es' for Spanish or 'en' for English
+
 @app.get("/")
 def root():
     return {"message": "POS System API", "version": "1.0.0"}
@@ -1968,6 +1972,36 @@ def translate_text(request: TranslateRequest):
         
     except Exception as e:
         print(f"[Translate] Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Translation API error: {str(e)}")
+
+@app.post("/api/translate/batch")
+def translate_batch(request: TranslateBatchRequest):
+    """Translate multiple texts in a single API call for better performance."""
+    if not GOOGLE_TRANSLATE_KEY:
+        raise HTTPException(status_code=500, detail="Translation service not configured")
+    
+    if not request.texts or len(request.texts) == 0:
+        return {"translated_texts": []}
+    
+    translate_url = f"https://translation.googleapis.com/language/translate/v2?key={GOOGLE_TRANSLATE_KEY}"
+
+    body = {
+        "q": request.texts,  # Send array of texts for batch translation
+        "source": "en",  # Explicitly specify English as source language
+        "target": request.target_language,
+        "format": "text"
+    }
+
+    try:        
+        response = requests.post(translate_url, json=body)
+        result = response.json()
+
+        # Extract all translated texts from the response
+        translated_texts = [translation["translatedText"] for translation in result["data"]["translations"]]
+        return {"translated_texts": translated_texts}
+        
+    except Exception as e:
+        print(f"[Translate Batch] Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Translation API error: {str(e)}")
 
 if __name__ == "__main__":
