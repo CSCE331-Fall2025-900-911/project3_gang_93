@@ -44,15 +44,20 @@ function Reports() {
     }
   };
 
-  const fetchZReport = async () => {
+  const fetchZReport = async (employeeId = null, employeeName = null) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await reportsAPI.getZReport(reportDate || null);
+      const data = await reportsAPI.getZReport(reportDate || null, employeeId, employeeName);
       setZReportData(data);
     } catch (err) {
       console.error("Failed to fetch Z-Report:", err);
-      setError("Failed to generate Z-Report");
+      const errorMessage = err.message || "Failed to generate Z-Report";
+      setError(errorMessage);
+      if (errorMessage.includes("already been run")) {
+        // If already run, we might want to show the existing report
+        // For now, just show the error
+      }
     } finally {
       setLoading(false);
     }
@@ -76,7 +81,33 @@ function Reports() {
     if (reportType === "x-report") {
       fetchXReport();
     } else if (reportType === "z-report") {
-      fetchZReport();
+      // Show warning and confirmation for Z-Report
+      const warningMessage = 
+        "⚠️ WARNING: Running Z-Report will LOCK the POS system!\n\n" +
+        "• Z-Report can only be run once per day\n" +
+        "• All POS functionality will be disabled after running\n" +
+        "• No new transactions can be processed until tomorrow\n" +
+        "• This action cannot be undone\n\n" +
+        "Are you sure you want to proceed?";
+      
+      if (window.confirm(warningMessage)) {
+        // Get employee info from localStorage if available
+        const employeeStr = localStorage.getItem("employee");
+        let employeeId = null;
+        let employeeName = null;
+        
+        if (employeeStr) {
+          try {
+            const employee = JSON.parse(employeeStr);
+            employeeId = employee.employeeId;
+            employeeName = `${employee.firstName || ''} ${employee.lastName || ''}`.trim();
+          } catch (e) {
+            console.error("Error parsing employee info:", e);
+          }
+        }
+        
+        fetchZReport(employeeId, employeeName);
+      }
     } else if (reportType === "product-usage") {
       fetchProductUsage();
     }

@@ -28,6 +28,8 @@ function AppContent() {
   const [employee, setEmployee] = useState(null);
   const [kioskLanguage, setKioskLanguage] = useState("en");
   const [modalTranslating, setModalTranslating] = useState(false);
+  const [posLocked, setPosLocked] = useState(false);
+  const [posLockInfo, setPosLockInfo] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -70,6 +72,28 @@ function AppContent() {
       }
     }
   }, [navigate, location.pathname]);
+
+  // Check POS status (if locked by Z-Report)
+  useEffect(() => {
+    const checkPOSStatus = async () => {
+      try {
+        const { reportsAPI } = await import("./services/api");
+        const status = await reportsAPI.getPOSStatus();
+        setPosLocked(status.locked || false);
+        setPosLockInfo(status);
+      } catch (err) {
+        console.error("Failed to check POS status:", err);
+        // If check fails, assume not locked (backward compatibility)
+        setPosLocked(false);
+        setPosLockInfo(null);
+      }
+    };
+    
+    checkPOSStatus();
+    // Check every 30 seconds
+    const interval = setInterval(checkPOSStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch menu items from backend on component mount
   useEffect(() => {
@@ -163,6 +187,20 @@ function AppContent() {
     tipAmount = 0
   ) => {
     if (Object.keys(cart).length === 0) return;
+    
+    // Check if POS is locked
+    if (posLocked) {
+      setAlertMessage(
+        `⚠️ POS is LOCKED\n\n` +
+        `Z-Report has been run today (${posLockInfo?.runDate || 'today'}).\n` +
+        `No new transactions can be processed until tomorrow.\n\n` +
+        (posLockInfo?.employeeName ? `Locked by: ${posLockInfo.employeeName}\n` : '') +
+        (posLockInfo?.runTime ? `Time: ${posLockInfo.runTime}` : '')
+      );
+      setPopupOpen(false);
+      return;
+    }
+    
     setPopupOpen(false);
 
     try {
@@ -348,6 +386,66 @@ function AppContent() {
       );
     }
 
+    // Show POS lock message if locked - lock entire interface
+    if (posLocked) {
+      return (
+        <div className="app" style={{ 
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#f5f5f5"
+        }}>
+          <main className="main-content" style={{ width: "100%", maxWidth: "800px" }}>
+            <div style={{ 
+              padding: "4rem 3rem", 
+              textAlign: "center",
+              margin: "2rem auto",
+              backgroundColor: "#fff3cd",
+              border: "3px solid #ffc107",
+              borderRadius: "12px",
+              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)"
+            }}>
+              <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>🔒</div>
+              <h2 style={{ color: "#856404", marginBottom: "1.5rem", fontSize: "2rem" }}>
+                Kiosk Temporarily Unavailable
+              </h2>
+              <p style={{ color: "#856404", fontSize: "1.2rem", marginBottom: "1rem", fontWeight: "500" }}>
+                The self-service kiosk is currently locked.
+              </p>
+              <p style={{ color: "#856404", marginBottom: "0.75rem", fontSize: "1.1rem" }}>
+                Z-Report has been run for today ({posLockInfo?.runDate || 'today'}).
+              </p>
+              <p style={{ color: "#856404", marginBottom: "1.5rem", fontSize: "1.1rem" }}>
+                No new orders can be placed until tomorrow.
+              </p>
+              {posLockInfo?.employeeName && (
+                <div style={{ 
+                  backgroundColor: "#fff",
+                  padding: "1rem",
+                  borderRadius: "8px",
+                  marginTop: "1.5rem",
+                  border: "1px solid #ffc107"
+                }}>
+                  <p style={{ color: "#856404", fontSize: "0.95rem", margin: "0.25rem 0" }}>
+                    <strong>Locked by:</strong> {posLockInfo.employeeName}
+                  </p>
+                  {posLockInfo?.runTime && (
+                    <p style={{ color: "#856404", fontSize: "0.95rem", margin: "0.25rem 0" }}>
+                      <strong>Time:</strong> {posLockInfo.runTime}
+                    </p>
+                  )}
+                </div>
+              )}
+              <p style={{ color: "#856404", fontSize: "1rem", marginTop: "2rem", fontStyle: "italic" }}>
+                Please check back tomorrow for service.
+              </p>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
     if (menuItems.length === 0) {
       return (
         <div className="app">
@@ -431,6 +529,76 @@ function AppContent() {
               <p>{error}</p>
               <p style={{ marginTop: "1rem", fontSize: "0.9rem" }}>
                 Make sure the backend server is running at {API_BASE_URL}
+              </p>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    // Show POS lock message if locked - lock entire interface
+    if (posLocked) {
+      return (
+        <div className="app" style={{ 
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column"
+        }}>
+          <Header
+            onManagerClick={handleManagerClick}
+            employee={employee}
+            onLogout={handleEmployeeLogout}
+          />
+          <main className="main-content" style={{ 
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "#f5f5f5"
+          }}>
+            <div style={{ 
+              padding: "4rem 3rem", 
+              textAlign: "center",
+              maxWidth: "800px",
+              margin: "2rem auto",
+              backgroundColor: "#fff3cd",
+              border: "3px solid #ffc107",
+              borderRadius: "12px",
+              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)"
+            }}>
+              <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>🔒</div>
+              <h2 style={{ color: "#856404", marginBottom: "1.5rem", fontSize: "2rem" }}>
+                POS System Locked
+              </h2>
+              <p style={{ color: "#856404", fontSize: "1.2rem", marginBottom: "1rem", fontWeight: "500" }}>
+                The POS system is currently locked.
+              </p>
+              <p style={{ color: "#856404", marginBottom: "0.75rem", fontSize: "1.1rem" }}>
+                Z-Report has been run for today ({posLockInfo?.runDate || 'today'}).
+              </p>
+              <p style={{ color: "#856404", marginBottom: "1.5rem", fontSize: "1.1rem" }}>
+                No new transactions can be processed until tomorrow.
+              </p>
+              {posLockInfo?.employeeName && (
+                <div style={{ 
+                  backgroundColor: "#fff",
+                  padding: "1rem",
+                  borderRadius: "8px",
+                  marginTop: "1.5rem",
+                  border: "1px solid #ffc107"
+                }}>
+                  <p style={{ color: "#856404", fontSize: "0.95rem", margin: "0.25rem 0" }}>
+                    <strong>Locked by:</strong> {posLockInfo.employeeName}
+                  </p>
+                  {posLockInfo?.runTime && (
+                    <p style={{ color: "#856404", fontSize: "0.95rem", margin: "0.25rem 0" }}>
+                      <strong>Time:</strong> {posLockInfo.runTime}
+                    </p>
+                  )}
+                </div>
+              )}
+              <p style={{ color: "#856404", fontSize: "1rem", marginTop: "2rem" }}>
+                <strong>Manager view is still accessible</strong> for reports and management functions.
               </p>
             </div>
           </main>

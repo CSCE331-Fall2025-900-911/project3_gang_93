@@ -310,10 +310,69 @@ def process_inventory_and_sales(inventory_updates, sales_records, trans_date, tr
         # Silently handle errors - don't fail the transaction
         pass
 
+@app.get("/api/pos/status")
+def get_pos_status():
+    """Check if POS is locked (Z-Report has been run today)"""
+    try:
+        today_date = get_cst_date().strftime('%Y-%m-%d')
+        
+        # Check if Z-Report has been run today
+        check_query = """
+            SELECT run_date, employee_id, employee_name, run_time
+            FROM z_report_runs
+            WHERE run_date = %s
+            LIMIT 1
+        """
+        result = execute_query(check_query, (today_date,), fetch_one=True)
+        
+        if result:
+            return {
+                "locked": True,
+                "runDate": str(result['run_date']),
+                "runTime": str(result['run_time']) if result.get('run_time') else None,
+                "employeeId": result.get('employee_id'),
+                "employeeName": result.get('employee_name')
+            }
+        else:
+            return {
+                "locked": False,
+                "runDate": None,
+                "runTime": None,
+                "employeeId": None,
+                "employeeName": None
+            }
+    except Exception as e:
+        # If table doesn't exist, POS is not locked
+        return {
+            "locked": False,
+            "runDate": None,
+            "runTime": None,
+            "employeeId": None,
+            "employeeName": None
+        }
+
 @app.post("/api/transactions", response_model=TransactionResponse)
 def create_transaction(transaction: TransactionCreate, background_tasks: BackgroundTasks):
     """Create a new transaction - returns immediately, processes inventory/sales in background"""
     try:
+        # Check if POS is locked (Z-Report has been run today)
+        today_date = get_cst_date().strftime('%Y-%m-%d')
+        check_query = """
+            SELECT run_date
+            FROM z_report_runs
+            WHERE run_date = %s
+            LIMIT 1
+        """
+        try:
+            lock_result = execute_query(check_query, (today_date,), fetch_one=True)
+            if lock_result:
+                raise HTTPException(
+                    status_code=403,
+                    detail="POS is locked. Z-Report has already been run today. No new transactions can be processed until tomorrow."
+                )
+        except Exception as e:
+            # If table doesn't exist or query fails, allow transaction (backward compatibility)
+            pass
         # Parse date/time from string if provided, otherwise use current CST time
         if transaction.date:
             trans_date = datetime.strptime(transaction.date, '%Y-%m-%d').date()
@@ -1774,17 +1833,55 @@ def get_x_report(report_date: Optional[str] = Query(None, description="Report da
         raise HTTPException(status_code=500, detail=f"Error generating X-Report: {str(e)}")
 
 
-@app.get("/api/reports/z-report", response_model=ZReportResponse)
-def get_z_report(report_date: Optional[str] = Query(None, description="Report date in YYYY-MM-DD format")):
+@app.post("/api/reports/z-report", response_model=ZReportResponse)
+def generate_z_report(request: ZReportRequest):
     """
     Z-Report: End-of-day totals and summary.
     Provides comprehensive daily sales information including tax calculations.
-    Note: In production, this would typically be run once at end of day.
+    WARNING: This will lock the POS system. Can only be run once per day.
     """
     try:
         # Use today if no date provided (in CST)
-        if not report_date:
+        if not request.report_date:
             report_date = get_cst_date().strftime('%Y-%m-%d')
+        else:
+            report_date = request.report_date
+        
+        # Check if Z-Report has already been run today
+        check_query = """
+            SELECT run_date, employee_id, employee_name, run_time
+            FROM z_report_runs
+            WHERE run_date = %s
+            LIMIT 1
+        """
+        try:
+            existing_run = execute_query(check_query, (report_date,), fetch_one=True)
+            if existing_run:
+                # Z-Report already run today - return error
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Z-Report has already been run today ({report_date}). It can only be run once per day. POS is locked until tomorrow."
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            # Table doesn't exist yet, create it
+            create_table_query = """
+                CREATE TABLE IF NOT EXISTS z_report_runs (
+                    id SERIAL PRIMARY KEY,
+                    run_date DATE NOT NULL UNIQUE,
+                    run_time TIME NOT NULL,
+                    employee_id INT,
+                    employee_name VARCHAR(100),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            try:
+                with get_db_cursor() as cursor:
+                    cursor.execute(create_table_query)
+            except Exception as e:
+                print(f"[Z-Report] Error creating table: {e}")
+                # Continue anyway - table might already exist
         
         # Tax rate (8.75%)
         TAX_RATE = 0.0875
@@ -1918,6 +2015,44 @@ def get_z_report(report_date: Optional[str] = Query(None, description="Report da
         
         avg_trans = total_sales / total_transactions if total_transactions > 0 else 0.0
         
+        # Record Z-Report run in database to lock POS
+        cst_now = get_cst_now()
+        run_time = cst_now.time()
+        run_date_obj = get_cst_date()
+        
+        try:
+            # Ensure table exists
+            create_table_query = """
+                CREATE TABLE IF NOT EXISTS z_report_runs (
+                    id SERIAL PRIMARY KEY,
+                    run_date DATE NOT NULL UNIQUE,
+                    run_time TIME NOT NULL,
+                    employee_id INT,
+                    employee_name VARCHAR(100),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            with get_db_cursor() as cursor:
+                cursor.execute(create_table_query)
+            
+            # Insert Z-Report run record
+            insert_query = """
+                INSERT INTO z_report_runs (run_date, run_time, employee_id, employee_name)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (run_date) DO NOTHING
+            """
+            execute_insert(insert_query, (
+                run_date_obj,
+                run_time,
+                request.employee_id,
+                request.employee_name
+            ), return_id=False)
+            
+            print(f"[Z-Report] Z-Report generated and POS locked for date: {report_date}")
+        except Exception as e:
+            print(f"[Z-Report] Warning: Could not record Z-Report run: {e}")
+            # Continue anyway - report was generated
+        
         return {
             "date": report_date,
             "totalSales": total_sales,
@@ -1927,9 +2062,12 @@ def get_z_report(report_date: Optional[str] = Query(None, description="Report da
             "totalTransactions": total_transactions,
             "avgTransaction": avg_trans,
             "lastResetDate": last_reset_date,
-            "lastResetEmployee": last_reset_employee
+            "lastResetEmployee": last_reset_employee,
+            "alreadyRun": False
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating Z-Report: {str(e)}")
 

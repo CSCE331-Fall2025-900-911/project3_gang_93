@@ -208,6 +208,11 @@ class XReportResponse(BaseModel):
     hourlyData: List[XReportHourlyData]
 
 # Z-Report Models (End-of-Day Report)
+class ZReportRequest(BaseModel):
+    report_date: Optional[str] = None  # Optional date in YYYY-MM-DD format
+    employee_id: Optional[int] = None  # Employee ID who is running the report
+    employee_name: Optional[str] = None  # Employee name who is running the report
+
 class ZReportResponse(BaseModel):
     date: str
     totalSales: Decimal
@@ -218,6 +223,7 @@ class ZReportResponse(BaseModel):
     avgTransaction: Decimal
     lastResetDate: Optional[str] = None
     lastResetEmployee: Optional[str] = None
+    alreadyRun: Optional[bool] = False  # Indicates if Z-Report was already run today
 
 # Product Usage Chart Models
 class ProductUsageData(BaseModel):

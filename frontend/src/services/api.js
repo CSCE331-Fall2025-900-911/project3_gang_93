@@ -337,11 +337,20 @@ export const reportsAPI = {
       : `${API_ENDPOINTS.REPORTS}/x-report`;
     return await apiRequest(endpoint);
   },
-  getZReport: async (reportDate = null) => {
-    const endpoint = reportDate
-      ? `${API_ENDPOINTS.REPORTS}/z-report?report_date=${reportDate}`
-      : `${API_ENDPOINTS.REPORTS}/z-report`;
-    return await apiRequest(endpoint);
+  getZReport: async (reportDate = null, employeeId = null, employeeName = null) => {
+    const endpoint = `${API_ENDPOINTS.REPORTS}/z-report`;
+    const payload = {
+      report_date: reportDate || null,
+      employee_id: employeeId || null,
+      employee_name: employeeName || null
+    };
+    return await apiRequest(endpoint, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  getPOSStatus: async () => {
+    return await apiRequest('/api/pos/status');
   },
   getProductUsage: async (startDate, endDate) => {
     return await apiRequest(
