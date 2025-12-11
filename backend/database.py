@@ -10,6 +10,15 @@ def get_db_connection():
     conn = None
     try:
         conn = psycopg2.connect(**DB_CONFIG)
+        # Set timezone to CST (America/Chicago) for all queries
+        # This ensures all timestamp operations use CST
+        with conn.cursor() as cursor:
+            cursor.execute("SET TIME ZONE 'America/Chicago'")
+            # Verify timezone is set correctly
+            cursor.execute("SHOW TIMEZONE")
+            tz_result = cursor.fetchone()
+            print(f"[Database] Connection timezone set to: {tz_result[0] if tz_result else 'unknown'}")
+        conn.commit()
         yield conn
         conn.commit()
     except Exception as e:

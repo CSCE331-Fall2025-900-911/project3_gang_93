@@ -12,8 +12,36 @@ import requests
 import json
 import os
 
+# Timezone support for CST
+try:
+    from zoneinfo import ZoneInfo
+    CST = ZoneInfo("America/Chicago")
+except ImportError:
+    try:
+        # Fallback for Python < 3.9
+        from backports.zoneinfo import ZoneInfo
+        CST = ZoneInfo("America/Chicago")
+    except ImportError:
+        # Final fallback: use pytz if available
+        import pytz
+        CST = pytz.timezone("America/Chicago")
+
 from models import *
 from database import execute_query, execute_insert, get_db_cursor
+
+def get_cst_now():
+    """Get current datetime in CST timezone"""
+    return datetime.now(CST)
+
+def get_cst_date():
+    """Get current date in CST timezone"""
+    return get_cst_now().date()
+
+def get_cst_time():
+    """Get current time in CST timezone"""
+    cst_now = get_cst_now()
+    # Return time as string in HH:MM:SS format to ensure timezone is preserved
+    return cst_now.strftime('%H:%M:%S')
 
 app = FastAPI(title="POS System API", version="1.0.0")
 
@@ -286,16 +314,21 @@ def process_inventory_and_sales(inventory_updates, sales_records, trans_date, tr
 def create_transaction(transaction: TransactionCreate, background_tasks: BackgroundTasks):
     """Create a new transaction - returns immediately, processes inventory/sales in background"""
     try:
-        # Parse date/time from string if provided, otherwise use current
+        # Parse date/time from string if provided, otherwise use current CST time
         if transaction.date:
             trans_date = datetime.strptime(transaction.date, '%Y-%m-%d').date()
         else:
-            trans_date = datetime.now().date()
+            trans_date = get_cst_date()
         
         if transaction.time:
+            # If time is provided, parse it
             trans_time = datetime.strptime(transaction.time, '%H:%M:%S').time()
         else:
-            trans_time = datetime.now().time()
+            # Get CST time - ensure we're using the actual CST time
+            cst_now = get_cst_now()
+            trans_time = cst_now.time()
+            # Log for debugging
+            print(f"[Transaction] Storing transaction with CST date: {trans_date}, CST time: {trans_time}, CST datetime: {cst_now}")
         
         # Use a single database connection for critical operations
         with get_db_cursor() as cursor:
@@ -436,16 +469,21 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
             }
             
             # Insert transaction (CRITICAL - must complete before returning)
+            # Store time as string to ensure CST timezone is preserved
+            # PostgreSQL TIME type doesn't store timezone, so we store the CST time value directly
+            trans_time_str = trans_time.strftime('%H:%M:%S') if hasattr(trans_time, 'strftime') else str(trans_time)
+            print(f"[Transaction] Storing time as: {trans_time_str} (from CST datetime: {get_cst_now()})")
+            
             cursor.execute("""
                 INSERT INTO transactions (transactionId, date, customerId, items, time, transactionType)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s::time, %s)
                 RETURNING transactionId
             """, (
                 transaction_id,
                 trans_date,
                 transaction.customerId,
                 json.dumps(items_json),
-                trans_time,
+                trans_time_str,
                 transaction.transactionType
             ))
             
@@ -799,13 +837,15 @@ def create_customer(customer: CustomerCreate):
         
         insert_query = """
             INSERT INTO customerRewards (customerId, firstName, lastName, DOB, phoneNumber, email, points, dateJoined)
-            VALUES (%s, %s, %s, %s, %s, %s, 0, CURRENT_DATE)
+            VALUES (%s, %s, %s, %s, %s, %s, 0, %s)
             RETURNING customerId, firstName, lastName, DOB, phoneNumber, email, points, dateJoined
         """
         
+        # Use CST date for dateJoined
+        cst_date = get_cst_date()
         result = execute_insert(
             insert_query,
-            (customer_id, customer.firstName, customer.lastName, customer.DOB, customer.phoneNumber, customer.email)
+            (customer_id, customer.firstName, customer.lastName, customer.DOB, customer.phoneNumber, customer.email, cst_date)
         )
         
         if not result:
@@ -1336,33 +1376,90 @@ def google_callback(code: str):
 def get_management_dashboard():
     """Get management dashboard data"""
     try:
-        # Get today's date in local timezone (not UTC)
-        today_date = datetime.now().date()
+        # Get today's date in CST timezone
+        today_date = get_cst_date()
+        today_date_str = today_date.strftime('%Y-%m-%d')
         
-        # Today's sales
-        today_sales_query = """
-            SELECT 
-                SUM(s.amountSold * COALESCE(m.price, a.price)) as revenue, 
-                COUNT(*) as transactions
-            FROM sales s
-            LEFT JOIN menu m ON s.itemName = m.menuItemName
-            LEFT JOIN addOns a ON s.itemName = a.addOnName
-            WHERE s.date = CURRENT_DATE
+        # Today's sales - use same calculation method as X-Report for consistency
+        # Count actual transactions (not sales records) and calculate from transaction items
+        today_transactions_query = """
+            SELECT
+                COUNT(CASE WHEN transactionType != 'void' THEN 1 END) as actual_transactions
+            FROM transactions
+            WHERE date = %s
         """
-        today = execute_query(today_sales_query, (today_date,), fetch_one=True)
+        today_count = execute_query(today_transactions_query, (today_date_str,), fetch_one=True)
+        
+        # Calculate total sales from transaction items (same as X-Report)
+        today_sales_query = """
+            SELECT
+                SUM(
+                    COALESCE(
+                        (SELECT SUM(m.price * (item->>'quantity')::int)
+                         FROM jsonb_array_elements(
+                             CASE 
+                                 WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                                 ELSE t.items->'items'
+                             END
+                         ) AS item
+                         LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+                         WHERE m.menuItemId IS NOT NULL),
+                        0
+                    ) + COALESCE(
+                        CASE 
+                            WHEN jsonb_typeof(t.items) = 'object' THEN (t.items->>'tip')::numeric
+                            ELSE 0
+                        END, 0
+                    )
+                ) as revenue
+            FROM transactions t
+            WHERE t.date = %s AND t.transactionType != 'void'
+        """
+        today = execute_query(today_sales_query, (today_date_str,), fetch_one=True)
         
         # Low stock items
         low_stock_query = "SELECT COUNT(*) as count FROM inventory WHERE quantity < 10"
         low_stock = execute_query(low_stock_query, fetch_one=True)
         
-        # Recent transactions
+        # Recent transactions - format date and time as strings
+        # Note: Since we set TIME ZONE in database connection, times should already be in CST
+        # Order by transactionId DESC as primary sort to ensure we get the most recent transactions
+        # (transactionId is auto-incrementing, so higher ID = more recent)
         recent_trans_query = """
-            SELECT transactionId, date, time, customerId, transactionType
+            SELECT 
+                transactionId, 
+                date::text as date,
+                time::text as time,
+                customerId, 
+                transactionType
             FROM transactions
-            ORDER BY date DESC, time DESC
+            ORDER BY transactionId DESC
             LIMIT 10
         """
         recent_transactions = execute_query(recent_trans_query)
+        
+        # Debug: Log the transaction IDs being returned
+        if recent_transactions:
+            trans_ids = [t['transactionid'] for t in recent_transactions]
+            print(f"[Dashboard] Recent transactions query returned IDs: {trans_ids}")
+        
+        # Format transactions to ensure proper date/time display (remove microseconds)
+        formatted_recent = []
+        for trans in recent_transactions:
+            date_str = str(trans['date']) if trans.get('date') else ''
+            time_str = str(trans['time']) if trans.get('time') else ''
+            # Remove microseconds if present (format: HH:MM:SS)
+            if time_str and '.' in time_str:
+                time_str = time_str.split('.')[0]
+            
+            formatted_recent.append({
+                'transactionid': trans['transactionid'],
+                'date': date_str,
+                'time': time_str,
+                'customerid': trans.get('customerid'),
+                'transactiontype': trans['transactiontype']
+            })
+        recent_transactions = formatted_recent
         
         # Top selling items today
         top_items_query = """
@@ -1377,7 +1474,7 @@ def get_management_dashboard():
         
         return {
             "todaySales": float(today['revenue']) if today and today['revenue'] else 0.0,
-            "todayTransactions": int(today['transactions']) if today else 0,
+            "todayTransactions": int(today_count['actual_transactions']) if today_count and today_count['actual_transactions'] else 0,
             "lowStockItems": int(low_stock['count']) if low_stock else 0,
             "recentTransactions": [dict(t) for t in recent_transactions] if recent_transactions else [],
             "topSellingItems": [dict(t) for t in top_items] if top_items else []
@@ -1396,9 +1493,9 @@ def get_x_report(report_date: Optional[str] = Query(None, description="Report da
     Can be run as often as desired with no side effects.
     """
     try:
-        # Use today if no date provided
+        # Use today if no date provided (in CST)
         if not report_date:
-            report_date = datetime.now().strftime('%Y-%m-%d')
+            report_date = get_cst_date().strftime('%Y-%m-%d')
         
         # Get daily totals
         daily_query = """
@@ -1685,9 +1782,9 @@ def get_z_report(report_date: Optional[str] = Query(None, description="Report da
     Note: In production, this would typically be run once at end of day.
     """
     try:
-        # Use today if no date provided
+        # Use today if no date provided (in CST)
         if not report_date:
-            report_date = datetime.now().strftime('%Y-%m-%d')
+            report_date = get_cst_date().strftime('%Y-%m-%d')
         
         # Tax rate (8.75%)
         TAX_RATE = 0.0875

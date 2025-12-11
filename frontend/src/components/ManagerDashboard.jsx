@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { managementAPI } from "../services/api";
 import "./ManagerDashboard.css";
 
@@ -6,24 +6,32 @@ function ManagerDashboard({ onNavigate }) {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const hasFetched = useRef(false);
 
   useEffect(() => {
+    // Only fetch once, even if component re-mounts
+    if (hasFetched.current) {
+      return;
+    }
+    
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true);
+        const data = await managementAPI.getDashboard();
+        setDashboardData(data);
+        setError(null);
+        hasFetched.current = true;
+      } catch (err) {
+        console.error("Failed to fetch dashboard:", err);
+        setError("Failed to load dashboard data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    // Only fetch on page load
     fetchDashboard();
   }, []);
-
-  const fetchDashboard = async () => {
-    try {
-      setLoading(true);
-      const data = await managementAPI.getDashboard();
-      setDashboardData(data);
-      setError(null);
-    } catch (err) {
-      console.error("Failed to fetch dashboard:", err);
-      setError("Failed to load dashboard data");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
