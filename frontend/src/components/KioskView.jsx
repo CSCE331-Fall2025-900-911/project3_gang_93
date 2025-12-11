@@ -5,7 +5,14 @@ import "./KioskView.css";
 
 function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, onCompleteTransaction, user, onLoginClick, onLogout, isExpanded, onToggleExpanded, onLanguageChange, modalTranslating = false }) {
   const [filter, setFilter] = useState("all");
-  const [currentStep, setCurrentStep] = useState("menu"); // "menu" or "cart"
+  // Initialize currentStep from localStorage
+  const getInitialCurrentStep = () => {
+    const saved = localStorage.getItem("kiosk_currentStep");
+    return saved || "menu";
+  };
+  
+  const [currentStep, setCurrentStep] = useState(getInitialCurrentStep); // "menu" or "cart"
+  const currentStepRef = useRef(getInitialCurrentStep()); // Use ref to persist currentStep across re-renders
   const [language, setLanguage] = useState(() => {
     // Initialize from localStorage if available, otherwise default to "en"
     const saved = localStorage.getItem("kiosk_language");
@@ -194,6 +201,27 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
     updateTranslatedCart();
   }, [language, cart]);
 
+  // Sync ref with state and persist to localStorage
+  useEffect(() => {
+    currentStepRef.current = currentStep;
+    localStorage.setItem("kiosk_currentStep", currentStep);
+  }, [currentStep]);
+
+  // Ensure we stay on cart page when cart changes (don't auto-switch to menu)
+  // Only switch to menu if user explicitly clicks "Add More Items" or cart badge
+  useEffect(() => {
+    // If we're on cart page and cart changes, ensure we stay on cart page
+    // Use ref to check previous state to avoid infinite loops
+    if (currentStepRef.current === "cart") {
+      // Always maintain cart view if ref says we're on cart
+      if (currentStep !== "cart") {
+        console.log("[KioskView] Cart changed but we're on cart page - maintaining cart view");
+        setCurrentStep("cart");
+        localStorage.setItem("kiosk_currentStep", "cart");
+      }
+    }
+  }, [cart, currentStep]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -257,7 +285,23 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
   // Include modalTranslating to wait for modal translations too
   const isTranslating = (translating || translatingMenuItems || translatingCart || modalTranslating);
 
-  if (currentStep === "cart" && cartItems.length > 0) {
+  // Show cart view if currentStep is "cart" (regardless of cart items length)
+  // This ensures we stay on cart page even after payment when cart is cleared
+  // Use ref as fallback to ensure we don't lose cart view during re-renders
+  const shouldShowCart = currentStep === "cart" || currentStepRef.current === "cart";
+  
+  // If ref says we're on cart but state doesn't match, fix it immediately
+  if (currentStepRef.current === "cart" && currentStep !== "cart") {
+    console.log("[KioskView] State mismatch detected - ref says cart but state is", currentStep, "- fixing...");
+    // Use a function to ensure we're setting the correct value
+    setCurrentStep(() => {
+      const saved = localStorage.getItem("kiosk_currentStep");
+      return saved === "cart" ? "cart" : currentStepRef.current;
+    });
+  }
+  
+  if (shouldShowCart) {
+    console.log("[KioskView] Rendering cart view - currentStep:", currentStep, "ref:", currentStepRef.current);
     return (
       <div className={`kiosk-view ${isExpanded ? 'kiosk-view-expanded' : ''}`}>
         {isTranslating && (
@@ -266,7 +310,17 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
             <p className="kiosk-translating-text">Translating...</p>
           </div>
         )}
-        <div className="kiosk-cart-view">
+        <div 
+          className="kiosk-cart-view"
+          onClick={(e) => {
+            // Prevent any clicks in cart view from bubbling
+            e.stopPropagation();
+          }}
+          onMouseDown={(e) => {
+            // Prevent mousedown events from bubbling
+            e.stopPropagation();
+          }}
+        >
           <div className="kiosk-cart-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <h2>
@@ -330,15 +384,34 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
             </div>
             <button 
               className="kiosk-back-button"
-              onClick={() => setCurrentStep("menu")}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setCurrentStep("menu");
+                currentStepRef.current = "menu";
+                localStorage.setItem("kiosk_currentStep", "menu");
+              }}
             >
               ← {translations.addMoreItems || "Add More Items"}
             </button>
           </div>
 
-          <div className="kiosk-cart-items">
+          <div className="kiosk-cart-items" onClick={(e) => e.stopPropagation()}>
             {Object.entries(translatedCart).map(([cartKey, item]) => (
-              <div key={cartKey} className="kiosk-cart-item">
+              <div 
+                key={cartKey} 
+                className="kiosk-cart-item"
+                onClick={(e) => {
+                  // Prevent any clicks on the cart item from bubbling up
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                }}
+                onMouseDown={(e) => {
+                  // Also prevent mousedown events
+                  e.stopPropagation();
+                }}
+              >
                 <div className="kiosk-cart-item-info">
                   <span className="kiosk-cart-item-name">{item.translatedName || item.name}</span>
                   <span className="kiosk-cart-item-price">
@@ -347,15 +420,45 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
                 </div>
                 <div className="kiosk-cart-item-controls">
                   <button
+                    type="button"
                     className="kiosk-quantity-button"
-                    onClick={() => onRemoveItem(cartKey)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.nativeEvent.stopImmediatePropagation();
+                      // CRITICAL: Set currentStep to cart FIRST, synchronously
+                      currentStepRef.current = "cart";
+                      localStorage.setItem("kiosk_currentStep", "cart");
+                      setCurrentStep("cart");
+                      // Then update cart
+                      onRemoveItem(cartKey);
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
                   >
                     −
                   </button>
                   <span className="kiosk-quantity">{item.quantity}</span>
                   <button
+                    type="button"
                     className="kiosk-quantity-button"
-                    onClick={() => onAddToCart(item)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.nativeEvent.stopImmediatePropagation();
+                      // CRITICAL: Set currentStep to cart FIRST, synchronously
+                      currentStepRef.current = "cart";
+                      localStorage.setItem("kiosk_currentStep", "cart");
+                      setCurrentStep("cart");
+                      // Then update cart
+                      onAddToCart(item);
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
                   >
                     +
                   </button>
@@ -381,11 +484,35 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
 
           <button
             className="kiosk-checkout-button"
-            onClick={onCompleteTransaction}
-            disabled={translating}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onCompleteTransaction();
+            }}
+            disabled={translating || cartItems.length === 0}
           >
             {translating ? "..." : (translations.checkout || "Checkout")}
           </button>
+          
+          {/* Show message if cart is empty */}
+          {cartItems.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+              <p>{translations.noItemsFound || "No items in cart"}</p>
+              <button
+                className="kiosk-back-button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setCurrentStep("menu");
+                  currentStepRef.current = "menu";
+                  localStorage.setItem("kiosk_currentStep", "menu");
+                }}
+                style={{ marginTop: '1rem' }}
+              >
+                ← {translations.addMoreItems || "Add More Items"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -473,7 +600,13 @@ function KioskView({ menuItems, cart, onItemClick, onAddToCart, onRemoveItem, on
           {cartItems.length > 0 && (
             <button
               className="kiosk-cart-badge"
-              onClick={() => setCurrentStep("cart")}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setCurrentStep("cart");
+                currentStepRef.current = "cart";
+                localStorage.setItem("kiosk_currentStep", "cart");
+              }}
             >
               🛒 {totalItems} {totalItems !== 1 ? (translations.items || "items") : (translations.item || "item")} • ${subtotal.toFixed(2)}
             </button>
