@@ -1258,25 +1258,22 @@ def google_callback(code: str):
     ).json()
 
     if "id_token" not in token_response:
-        # Determine frontend based on redirect_uri (same logic as success case)
-        redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "")
+        # Determine frontend URL - prioritize localhost if it exists in CORS_ORIGINS
         cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:5173")
         allowed_origins = [origin.strip().strip('"').strip("'") for origin in cors_origins_str.split(",") if origin.strip()]
         
-        frontend = "http://localhost:5173"  # Default fallback
-        if redirect_uri:
-            if "localhost" in redirect_uri or "127.0.0.1" in redirect_uri:
-                for origin in allowed_origins:
-                    if "localhost" in origin or "127.0.0.1" in origin:
-                        frontend = origin
-                        break
-            else:
-                for origin in allowed_origins:
-                    if "localhost" not in origin and "127.0.0.1" not in origin:
-                        frontend = origin
-                        break
-                if frontend == "http://localhost:5173" and allowed_origins:
-                    frontend = allowed_origins[0]
+        localhost_origins = [origin for origin in allowed_origins if "localhost" in origin.lower() or "127.0.0.1" in origin]
+        non_localhost_origins = [origin for origin in allowed_origins if "localhost" not in origin.lower() and "127.0.0.1" not in origin]
+        
+        if localhost_origins:
+            frontend = localhost_origins[0]
+            print(f"[OAuth Error] Using localhost frontend: {frontend}")
+        elif non_localhost_origins:
+            frontend = non_localhost_origins[0]
+            print(f"[OAuth Error] Using deployed frontend: {frontend}")
+        else:
+            frontend = "http://localhost:5173"
+            print(f"[OAuth Error] Using default frontend: {frontend}")
         
         return RedirectResponse(f"{frontend}/customer/login?error=oauth_failed")
 
@@ -1295,31 +1292,30 @@ def google_callback(code: str):
     first_name = name.split(" ")[0] if name else ""
     last_name = name.split(" ")[1] if len(name.split(" ")) > 1 else ""
 
-    # Determine frontend URL based on redirect_uri to match local vs deployed
-    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "")
+    # Determine frontend URL - prioritize localhost if it exists in CORS_ORIGINS
     cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:5173")
-    allowed_origins = [origin.strip().strip('"').strip("'") for origin in cors_origins_str.split(",") if origin.strip()]
+    print(f"[OAuth] CORS_ORIGINS from env: {cors_origins_str}")
     
-    # Determine frontend based on redirect_uri
-    # If redirect_uri contains localhost, use localhost frontend
-    # Otherwise, use the first non-localhost origin or first origin
-    frontend = "http://localhost:5173"  # Default fallback
-    if redirect_uri:
-        if "localhost" in redirect_uri or "127.0.0.1" in redirect_uri:
-            # Find localhost origin in allowed origins
-            for origin in allowed_origins:
-                if "localhost" in origin or "127.0.0.1" in origin:
-                    frontend = origin
-                    break
-        else:
-            # For deployed, use first non-localhost origin
-            for origin in allowed_origins:
-                if "localhost" not in origin and "127.0.0.1" not in origin:
-                    frontend = origin
-                    break
-            # If no non-localhost found, use first origin
-            if frontend == "http://localhost:5173" and allowed_origins:
-                frontend = allowed_origins[0]
+    allowed_origins = [origin.strip().strip('"').strip("'") for origin in cors_origins_str.split(",") if origin.strip()]
+    print(f"[OAuth] Parsed allowed_origins: {allowed_origins}")
+    
+    # Separate localhost and non-localhost origins
+    localhost_origins = [origin for origin in allowed_origins if "localhost" in origin.lower() or "127.0.0.1" in origin]
+    non_localhost_origins = [origin for origin in allowed_origins if "localhost" not in origin.lower() and "127.0.0.1" not in origin]
+    
+    print(f"[OAuth] Localhost origins found: {localhost_origins}")
+    print(f"[OAuth] Non-localhost origins found: {non_localhost_origins}")
+    
+    # Always prioritize localhost if it exists, otherwise use first non-localhost
+    if localhost_origins:
+        frontend = localhost_origins[0]
+        print(f"[OAuth] ✓ Using localhost frontend: {frontend}")
+    elif non_localhost_origins:
+        frontend = non_localhost_origins[0]
+        print(f"[OAuth] ✗ Using deployed frontend: {frontend}")
+    else:
+        frontend = "http://localhost:5173"  # Default fallback
+        print(f"[OAuth] ⚠ Using default frontend: {frontend}")
 
     params = urllib.parse.urlencode({
         "email": email,
@@ -1331,7 +1327,7 @@ def google_callback(code: str):
     # Redirect to frontend root with user info - App.jsx will handle routing
     # This avoids 404 errors on routes that don't exist server-side
     redirect_url = f"{frontend}/?{params}"
-    print(f"[OAuth] Redirecting to frontend: {redirect_url} (detected from redirect_uri: {redirect_uri})")
+    print(f"[OAuth] Redirecting to frontend: {redirect_url}")
     return RedirectResponse(url=redirect_url)
 
 # ================== MANAGEMENT APIs ==================

@@ -32,37 +32,40 @@ function AppContent() {
 
   // Check for existing sessions on mount
   useEffect(() => {
-    // Check for OAuth callback
+    // Check for OAuth callback - only redirect if we're NOT already on /customer/login
     const urlParams = new URLSearchParams(window.location.search);
     const email = urlParams.get("email");
     const error = urlParams.get("error");
     
-    if (email || error) {
+    if ((email || error) && location.pathname !== "/customer/login") {
       // OAuth callback detected - redirect to customer login page with params
       const currentParams = window.location.search;
       navigate(`/customer/login${currentParams}`, { replace: true });
-      return;
+      return; // Exit early, don't check localStorage yet
     }
     
-    // Check if user is already logged in from previous session
-    const storedUser = localStorage.getItem("kiosk_user");
-    if (storedUser) {
-      try {
-        const userInfo = JSON.parse(storedUser);
-        setKioskUser(userInfo);
-      } catch (e) {
-        localStorage.removeItem("kiosk_user");
+    // Only check localStorage if we're not processing OAuth callback
+    if (!email && !error) {
+      // Check if user is already logged in from previous session
+      const storedUser = localStorage.getItem("kiosk_user");
+      if (storedUser) {
+        try {
+          const userInfo = JSON.parse(storedUser);
+          setKioskUser(userInfo);
+        } catch (e) {
+          localStorage.removeItem("kiosk_user");
+        }
       }
-    }
 
-    // Check for stored employee session
-    const storedEmployee = localStorage.getItem("employee");
-    if (storedEmployee) {
-      try {
-        const employeeInfo = JSON.parse(storedEmployee);
-        setEmployee(employeeInfo);
-      } catch (e) {
-        localStorage.removeItem("employee");
+      // Check for stored employee session
+      const storedEmployee = localStorage.getItem("employee");
+      if (storedEmployee) {
+        try {
+          const employeeInfo = JSON.parse(storedEmployee);
+          setEmployee(employeeInfo);
+        } catch (e) {
+          localStorage.removeItem("employee");
+        }
       }
     }
   }, [navigate, location.pathname]);

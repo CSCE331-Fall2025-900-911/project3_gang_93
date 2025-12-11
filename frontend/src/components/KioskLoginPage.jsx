@@ -27,7 +27,10 @@ function KioskLoginPage({ onLoginSuccess, onCancel }) {
       setError("Authentication failed. Please try again.");
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (email) {
+      return;
+    }
+
+    if (email) {
       // User successfully authenticated via OAuth callback
       const userInfo = {
         email: decodeURIComponent(email),
@@ -49,7 +52,7 @@ function KioskLoginPage({ onLoginSuccess, onCancel }) {
       // Store in localStorage for session persistence
       localStorage.setItem("kiosk_user", JSON.stringify(userInfo));
 
-      // Clean up URL immediately
+      // Clean up URL immediately - remove all query params
       window.history.replaceState({}, document.title, "/customer/login");
 
       // Notify parent component (this will navigate to /customer)
@@ -58,19 +61,25 @@ function KioskLoginPage({ onLoginSuccess, onCancel }) {
         console.log("[KioskLoginPage] Calling onLoginSuccess");
         onLoginSuccess(userInfo);
       }, 0);
-    } else {
-      // Check if user is already logged in from previous session
-      const storedUser = localStorage.getItem("kiosk_user");
-      if (storedUser) {
-        try {
-          const userInfo = JSON.parse(storedUser);
+      return; // Exit early to prevent checking localStorage
+    }
+
+    // Only check localStorage if there are NO OAuth params
+    // This prevents infinite loops when user is already logged in
+    const storedUser = localStorage.getItem("kiosk_user");
+    if (storedUser && !email && !error) {
+      try {
+        const userInfo = JSON.parse(storedUser);
+        // Only auto-login if we're on the login page and not processing OAuth
+        if (window.location.pathname === "/customer/login") {
           onLoginSuccess(userInfo);
-        } catch (e) {
-          localStorage.removeItem("kiosk_user");
         }
+      } catch {
+        localStorage.removeItem("kiosk_user");
       }
     }
-  }, [onLoginSuccess]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount, not when onLoginSuccess changes
 
   const handleGoogleLogin = () => {
     setLoading(true);
