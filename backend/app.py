@@ -345,7 +345,8 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                 "25%": 0.25,
                 "50%": 0.5,
                 "75%": 0.75,
-                "100%": 1.0
+                "100%": 1.0,
+                "125%": 1.25
             }
 
             # Calculate total and prepare data
@@ -363,14 +364,6 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                 item_total = float(menu_item['price']) * item.quantity
                 total += item_total
                 
-                # Preserve all item fields including add-ons, ice, sweetness, etc.
-                item_data = {
-                    "menuItemId": item.menuItemId,
-                    "quantity": item.quantity,
-                    "addOnIDs": item.addOnIDs,
-                    "ice": item.ice,
-                    "sweetness": item.sweetness
-                }
                 
                 # Prepare inventory updates (for background processing)
                 ingredients = menu_item['ingredients']
