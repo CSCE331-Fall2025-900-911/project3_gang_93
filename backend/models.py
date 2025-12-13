@@ -45,6 +45,7 @@ class TransactionItem(BaseModel):
     # Optional customization fields
     ice: Optional[Literal["no ice","light", "normal", "extra"]] = None
     sweetness: Optional[Literal["0%", "25%", "50%", "75%", "100%", "125%"]] = None
+    size: Optional[Literal["small", "regular", "large"]] = None
 
 class TransactionCreate(BaseModel):
     customerId: Optional[int] = None

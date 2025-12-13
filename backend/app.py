@@ -456,15 +456,26 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                 item_total = float(menu_item['price']) * item.quantity
                 total += item_total
                 
-                # Preserve all item fields including add-ons, ice, sweetness, etc.
+                # Preserve all item fields including add-ons, ice, sweetness, size, etc.
                 item_data = {
                     "menuItemId": item.menuItemId,
                     "quantity": item.quantity,
                     "addOnIDs": item.addOnIDs,
                     "ice": item.ice,
-                    "sweetness": item.sweetness
+                    "sweetness": item.sweetness,
+                    "size": item.size
                 }
                 items_with_prices.append(item_data)
+                
+                # Size multipliers for ingredient quantities
+                SIZE_MULTIPLIERS = {
+                    "small": 0.75,
+                    "regular": 1.0,
+                    "large": 1.25
+                }
+                
+                # Get size multiplier (default to regular if not specified)
+                size_multiplier = SIZE_MULTIPLIERS.get(item.size, 1.0) if item.size else 1.0
                 
                 # Prepare inventory updates (for background processing)
                 ingredients = menu_item['ingredients']
@@ -474,7 +485,8 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                     
                     for ingredient in ingredients:
                         item_id = ingredient['itemId']
-                        qty_to_deduct = ingredient['qty'] * item.quantity
+                        # Apply size multiplier to ingredient quantity
+                        qty_to_deduct = ingredient['qty'] * size_multiplier * item.quantity
                         inventory_updates[item_id] = inventory_updates.get(item_id, 0) + qty_to_deduct
                 
                 # Prepare sales records (for background processing)
@@ -496,7 +508,8 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
 
                     for ing in addon_ing:
                         item_id = ing['itemId']
-                        qty_to_deduct = ing['qty'] * item.quantity
+                        # Apply size multiplier to add-on ingredient quantity as well
+                        qty_to_deduct = ing['qty'] * size_multiplier * item.quantity
                         inventory_updates[item_id] = inventory_updates.get(item_id, 0) + qty_to_deduct
 
 
@@ -506,8 +519,9 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                     })
 
                 if SIMPLE_SYRUP_ID is not None and BASE_SYRUP_QTY is not None:
-                    factor = SWEETNESS_MULTIPLIERS[item.sweetness]
-                    syrup_qty = BASE_SYRUP_QTY * factor * item.quantity
+                    factor = SWEETNESS_MULTIPLIERS.get(item.sweetness, 1.0) if item.sweetness else 1.0
+                    # Apply size multiplier to syrup quantity as well
+                    syrup_qty = BASE_SYRUP_QTY * factor * size_multiplier * item.quantity
                     inventory_updates[SIMPLE_SYRUP_ID] = (
                         inventory_updates.get(SIMPLE_SYRUP_ID, 0) + syrup_qty
                     )
