@@ -12,4 +12,6 @@ export default defineConfig({
     // Copy public folder contents to dist
     copyPublicDir: true,
   },
+  // Vite automatically handles SPA routing in dev mode
+  // For production, the Express server (server.js) handles routing
 })
