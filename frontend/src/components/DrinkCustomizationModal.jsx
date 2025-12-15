@@ -225,6 +225,7 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
       setIceLevel("normal");
       setSize("regular");
       setSweetnessLevel("100%");
+      // Note: If temperature is set to "hot" elsewhere, ice will be auto-set to "no ice" via the temperature change handler
       // Fetch add-ons - translations will happen after add-ons load (via dependency array)
       fetchAddOns();
     } else {
@@ -235,6 +236,13 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
       }
     }
   }, [isOpen, onTranslatingChange]);
+
+  // Automatically set ice to "no ice" when temperature is set to "hot"
+  useEffect(() => {
+    if (temperature === "hot" && iceLevel !== "no ice") {
+      setIceLevel("no ice");
+    }
+  }, [temperature, iceLevel]);
 
   const fetchAddOns = async () => {
     try {
@@ -362,9 +370,9 @@ function DrinkCustomizationModal({ item, isOpen, onClose, onAddToCart, isExpande
                   }`}
                   onClick={() => {
                     setTemperature(option.value);
-                    // If switching to hot, set ice to "no"
+                    // If switching to hot, automatically set ice to "no ice"
                     if (option.value === "hot") {
-                      setIceLevel("no");
+                      setIceLevel("no ice");
                     }
                   }}
                 >
