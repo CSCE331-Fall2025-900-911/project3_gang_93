@@ -274,16 +274,23 @@ def get_add_ons():
 def process_inventory_and_sales(inventory_updates, sales_records, trans_date, trans_time):
     """Background task to process inventory updates and sales records"""
     try:
+        print(f"[Background] Starting inventory/sales processing at {trans_date} {trans_time}")
+        print(f"[Background] Received inventory_updates: {inventory_updates}")
         with get_db_cursor() as cursor:
             # Batch inventory updates using executemany
             if inventory_updates:
+                print(f"[Background] Processing {len(inventory_updates)} inventory updates")
                 inventory_batch = [(total_qty, item_id, total_qty) 
                                  for item_id, total_qty in inventory_updates.items()]
+                print(f"[Background] Inventory batch: {inventory_batch}")
                 cursor.executemany("""
                     UPDATE inventory
                     SET quantity = quantity - %s
                     WHERE itemId = %s AND quantity >= %s
                 """, inventory_batch)
+                print(f"[Background] ✓ Inventory update completed for {len(inventory_batch)} items")
+            else:
+                print(f"[Background] WARNING: No inventory updates to process!")
             
             # Batch sales inserts
             if sales_records:
@@ -307,8 +314,10 @@ def process_inventory_and_sales(inventory_updates, sales_records, trans_date, tr
                         VALUES (%s, %s, %s, %s, %s)
                     """, sales_batch)
     except Exception as e:
-        # Silently handle errors - don't fail the transaction
-        pass
+        # Log errors for debugging - don't fail the transaction
+        print(f"[Background] Error processing inventory/sales: {e}")
+        import traceback
+        traceback.print_exc()
 
 @app.get("/api/pos/status")
 def get_pos_status():
@@ -409,9 +418,50 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
             cursor.execute("SELECT * FROM addOns")
             addon_items = cursor.fetchall()
             
+            # Fetch inventory items to find cup and straw IDs
+            cursor.execute("SELECT itemId, itemName FROM inventory")
+            inventory_items = cursor.fetchall()
+            
             # Create lookup dictionary
             menu_dict = {item['menuitemid']: item for item in menu_items}
             addon_dict = {item['addonid']: item for item in addon_items}
+            
+            # Find cup and straw item IDs by name pattern
+            SMALL_CUP_ID = None
+            MEDIUM_CUP_ID = None
+            LARGE_CUP_ID = None
+            STRAW_ID = None
+            
+            print(f"[Inventory] Searching through {len(inventory_items)} inventory items for cups and straws...")
+            for inv_item in inventory_items:
+                # Handle both lowercase and mixed case column names
+                item_name = inv_item.get('itemname') or inv_item.get('itemName', '')
+                item_id = inv_item.get('itemid') or inv_item.get('itemId')
+                item_name_lower = item_name.lower()
+                
+                # Debug: print all inventory items to see what we have
+                if 'cup' in item_name_lower or 'straw' in item_name_lower:
+                    print(f"[Inventory] Checking item: ID={item_id}, Name='{item_name}'")
+                
+                # Look for cup items (case-insensitive matching)
+                # Check in order: small, large, then medium/regular
+                if 'cup' in item_name_lower:
+                    if 'small' in item_name_lower and SMALL_CUP_ID is None:
+                        SMALL_CUP_ID = item_id
+                        print(f"[Inventory] ✓ Found Small Cup: ID={item_id}, Name='{item_name}'")
+                    elif 'large' in item_name_lower and LARGE_CUP_ID is None:
+                        LARGE_CUP_ID = item_id
+                        print(f"[Inventory] ✓ Found Large Cup: ID={item_id}, Name='{item_name}'")
+                    elif ('medium' in item_name_lower or 'regular' in item_name_lower) and MEDIUM_CUP_ID is None:
+                        MEDIUM_CUP_ID = item_id
+                        print(f"[Inventory] ✓ Found Medium Cup: ID={item_id}, Name='{item_name}'")
+                
+                # Look for straw items (check separately, not in elif chain)
+                if 'straw' in item_name_lower and STRAW_ID is None:
+                    STRAW_ID = item_id
+                    print(f"[Inventory] ✓ Found Straw: ID={item_id}, Name='{item_name}'")
+            
+            print(f"[Inventory] Final Cup IDs - Small: {SMALL_CUP_ID}, Medium: {MEDIUM_CUP_ID}, Large: {LARGE_CUP_ID}, Straw: {STRAW_ID}")
             
             SIMPLE_SYRUP_ID = None # Find Simple Syrup ID
             BASE_SYRUP_QTY = None # 100% sweetness qty
@@ -525,6 +575,43 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
                     inventory_updates[SIMPLE_SYRUP_ID] = (
                         inventory_updates.get(SIMPLE_SYRUP_ID, 0) + syrup_qty
                     )
+                
+                # Get size from item (handle both object and dict formats)
+                drink_size = None
+                if hasattr(item, 'size'):
+                    drink_size = item.size
+                elif isinstance(item, dict):
+                    drink_size = item.get('size')
+                
+                print(f"[Transaction] Processing item: menuItemId={item.menuItemId}, quantity={item.quantity}, size={drink_size}")
+                
+                # Deduct 1 cup based on size for each drink
+                cup_id = None
+                if drink_size == "small":
+                    cup_id = SMALL_CUP_ID
+                    print(f"[Transaction] Small drink detected - using Small Cup ID: {cup_id}")
+                elif drink_size == "large":
+                    cup_id = LARGE_CUP_ID
+                    print(f"[Transaction] Large drink detected - using Large Cup ID: {cup_id}")
+                else:  # regular, medium, or no size specified - use medium cup
+                    cup_id = MEDIUM_CUP_ID
+                    print(f"[Transaction] Regular/Medium/No size drink - using Medium Cup ID: {cup_id}, size={drink_size}")
+                
+                if cup_id is not None:
+                    # Deduct 1 cup per drink (quantity)
+                    current_qty = inventory_updates.get(cup_id, 0)
+                    inventory_updates[cup_id] = current_qty + item.quantity
+                    print(f"[Transaction] ✓ Deducting {item.quantity} {drink_size or 'medium'} cup(s) (ID: {cup_id}), total to deduct: {inventory_updates[cup_id]}")
+                else:
+                    print(f"[Transaction] ✗ WARNING: No cup ID found for size={drink_size}, available: Small={SMALL_CUP_ID}, Medium={MEDIUM_CUP_ID}, Large={LARGE_CUP_ID}")
+                
+                # Deduct 1 straw per drink (regardless of size)
+                if STRAW_ID is not None:
+                    current_straw_qty = inventory_updates.get(STRAW_ID, 0)
+                    inventory_updates[STRAW_ID] = current_straw_qty + item.quantity
+                    print(f"[Transaction] ✓ Deducting {item.quantity} straw(s) (ID: {STRAW_ID}), total to deduct: {inventory_updates[STRAW_ID]}")
+                else:
+                    print(f"[Transaction] ✗ WARNING: No straw ID found! STRAW_ID={STRAW_ID}")
 
             # Add tip to total
             tip_amount = float(transaction.tip) if transaction.tip else 0.0
@@ -573,6 +660,9 @@ def create_transaction(transaction: TransactionCreate, background_tasks: Backgro
             
             # Schedule inventory and sales processing in background
             # This allows us to return immediately while processing continues
+            print(f"[Transaction] Scheduling background task with inventory_updates: {inventory_updates}")
+            cup_straw_updates = {k: v for k, v in inventory_updates.items() if k in [SMALL_CUP_ID, MEDIUM_CUP_ID, LARGE_CUP_ID, STRAW_ID] if k is not None}
+            print(f"[Transaction] Cup/Straw updates being scheduled: {cup_straw_updates}")
             background_tasks.add_task(
                 process_inventory_and_sales,
                 inventory_updates,
@@ -1465,7 +1555,7 @@ def get_management_dashboard():
         
         # Calculate total sales from transaction items (same as X-Report)
         today_sales_query = """
-            SELECT
+            SELECT 
                 SUM(
                     COALESCE(
                         (SELECT SUM(m.price * (item->>'quantity')::int)
@@ -1695,14 +1785,14 @@ def get_x_report(report_date: Optional[str] = Query(None, description="Report da
                         END,
                         0
                     ) as tip_amount
-                FROM jsonb_array_elements(
-                    CASE 
-                        WHEN jsonb_typeof(t.items) = 'array' THEN t.items
+                         FROM jsonb_array_elements(
+                             CASE 
+                                 WHEN jsonb_typeof(t.items) = 'array' THEN t.items
                         WHEN jsonb_typeof(t.items) = 'object' AND t.items ? 'items' THEN t.items->'items'
                         ELSE '[]'::jsonb
-                    END
-                ) AS item
-                LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
+                             END
+                         ) AS item
+                         LEFT JOIN menu m ON (item->>'menuItemId')::int = m.menuItemId
             ) AS item_calc
             WHERE t.date = %s AND t.transactionType = 'void'
         """

@@ -180,6 +180,9 @@ export const transactionAPI = {
         if (item.sweetness !== undefined && item.sweetness !== null) {
           itemData.sweetness = item.sweetness;
         }
+        if (item.size !== undefined && item.size !== null) {
+          itemData.size = item.size;
+        }
         if (item.addOnIDs !== undefined && item.addOnIDs !== null) {
           itemData.addOnIDs = item.addOnIDs;
         }
